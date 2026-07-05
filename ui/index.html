@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Backup Helper</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot" id="statusDot"></span>
+        <div>
+          <div class="brand-title">Sao lưu dữ liệu</div>
+          <div class="brand-sub" id="statusText">Đang khởi động…</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnToggle" class="btn">Tạm dừng</button>
+        <button id="btnBackupNow" class="btn btn-primary">Sao lưu ngay</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Cặp thư mục -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Thư mục cần sao lưu</h2>
+          <button id="btnAddPair" class="btn btn-sm">+ Thêm cặp</button>
+        </div>
+        <div id="pairList" class="pair-list"></div>
+        <p id="pairEmpty" class="empty">Chưa có thư mục nào. Bấm “+ Thêm cặp” để bắt đầu.</p>
+      </section>
+
+      <!-- Chế độ -->
+      <section class="card">
+        <div class="card-head"><h2>Chế độ sao lưu</h2></div>
+        <div class="mode-row">
+          <label class="radio">
+            <input type="radio" name="mode" value="periodic" />
+            <span>Định kỳ mỗi
+              <input type="number" id="interval" min="1" value="30" class="num" /> phút</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="mode" value="realtime" />
+            <span>Ngay khi có thay đổi (thời gian thực)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Cài đặt -->
+      <section class="card">
+        <div class="card-head"><h2>Cài đặt</h2></div>
+        <label class="switch-row">
+          <input type="checkbox" id="autostart" />
+          <span>Tự khởi động cùng máy tính (chạy ngầm dưới khay)</span>
+        </label>
+      </section>
+
+      <!-- Nhật ký -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Nhật ký (2 ngày gần nhất)</h2>
+          <button id="btnRefreshLog" class="btn btn-sm">Làm mới</button>
+        </div>
+        <pre id="logView" class="log"></pre>
+      </section>
+    </main>
+
+    <!-- Hộp thoại thêm cặp -->
+    <div id="dialog" class="overlay hidden">
+      <div class="modal">
+        <h3>Thêm thư mục sao lưu</h3>
+        <label class="field">
+          <span>Thư mục nguồn (cần sao lưu)</span>
+          <div class="pick">
+            <input id="dlgSource" type="text" placeholder="Chọn thư mục…" readonly />
+            <button id="dlgPickSource" class="btn btn-sm">Chọn</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Thư mục đích (nơi lưu backup)</span>
+          <div class="pick">
+            <input id="dlgDest" type="text" placeholder="Chọn thư mục…" readonly />
+            <button id="dlgPickDest" class="btn btn-sm">Chọn</button>
+          </div>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" id="dlgMirror" />
+          <span>Mirror: xóa ở backup khi file nguồn bị xóa
+            <br /><small>Bỏ chọn = luôn giữ lại bản backup (an toàn hơn)</small></span>
+        </label>
+        <div class="modal-actions">
+          <button id="dlgCancel" class="btn">Hủy</button>
+          <button id="dlgSave" class="btn btn-primary">Thêm</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="main.js"></script>
+  </body>
+</html>
