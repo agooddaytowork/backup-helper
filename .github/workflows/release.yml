@@ -1,0 +1,70 @@
+name: Build & Release
+
+# Đóng gói bản cài cho Windows, macOS, Linux khi push tag dạng v* (vd: v0.1.0),
+# hoặc chạy tay từ tab Actions.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'   # macOS Apple Silicon
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'     # macOS Intel
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài thư viện hệ thống (chỉ Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Cài Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Cài Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Cài dependency frontend
+        run: npm ci
+
+      - name: Build & tạo release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Backup Helper ${{ github.ref_name }}'
+          releaseBody: 'Tải bản cài phù hợp với hệ điều hành của bạn ở phần Assets bên dưới.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
