@@ -2,6 +2,8 @@ mod backup;
 mod config;
 mod engine;
 mod logger;
+mod sync;
+mod v2;
 
 use config::{Config, Mode, Pair};
 use engine::Engine;
@@ -292,6 +294,9 @@ pub fn run() {
                 engine: Mutex::new(Some(eng)),
             });
 
+            // State v2: engine đồng bộ 2 chiều + replication cloud.
+            app.manage(Mutex::new(v2::init(&handle)));
+
             build_tray(app)?;
 
             // Đóng cửa sổ = thu nhỏ xuống khay, không thoát app.
@@ -324,7 +329,22 @@ pub fn run() {
             set_running,
             set_autostart,
             backup_now,
-            show_window
+            show_window,
+            v2::v2_get_config,
+            v2::v2_status,
+            v2::v2_add_pair,
+            v2::v2_remove_pair,
+            v2::v2_plan,
+            v2::v2_apply,
+            v2::v2_resolve,
+            v2::v2_undo,
+            v2::v2_undo_last,
+            v2::v2_history,
+            v2::v2_restore_version,
+            v2::v2_add_target,
+            v2::v2_remove_target,
+            v2::v2_replicate,
+            v2::v2_connect_remote
         ])
         .run(tauri::generate_context!())
         .expect("lỗi khi chạy ứng dụng Backup Helper");

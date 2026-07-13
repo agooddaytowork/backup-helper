@@ -60,11 +60,15 @@ pub struct TargetResult {
 }
 
 impl Rclone {
-    /// Định vị rclone: env RCLONE_BIN -> PATH ("rclone"). Trả None nếu không chạy được.
+    /// Định vị rclone. Kiểm cả đường dẫn tuyệt đối phổ biến vì app GUI trên
+    /// macOS/Linux khi mở từ Finder KHÔNG kế thừa PATH của shell.
     pub fn locate() -> Option<Rclone> {
         let candidates = [
             std::env::var("RCLONE_BIN").ok(),
             Some("rclone".to_string()),
+            Some("/opt/homebrew/bin/rclone".to_string()),
+            Some("/usr/local/bin/rclone".to_string()),
+            Some("/usr/bin/rclone".to_string()),
         ];
         for c in candidates.into_iter().flatten() {
             let rc = Rclone {
@@ -104,6 +108,25 @@ impl Rclone {
                 "rclone version lỗi",
             ))
         }
+    }
+
+    /// Tạo remote mới (kích hoạt OAuth: rclone tự mở trình duyệt cho user đồng ý).
+    /// provider: "drive" (Google Drive), "onedrive" (OneDrive)...
+    /// Lệnh này BLOCK tới khi user hoàn tất đăng nhập trong trình duyệt.
+    pub fn config_create(&self, name: &str, provider: &str) -> std::io::Result<CopyOutcome> {
+        let out = self
+            .base_cmd()
+            .arg("config")
+            .arg("create")
+            .arg(name)
+            .arg(provider)
+            .output()?;
+        let mut combined = String::from_utf8_lossy(&out.stdout).to_string();
+        combined.push_str(&String::from_utf8_lossy(&out.stderr));
+        Ok(CopyOutcome {
+            success: out.status.success(),
+            output: combined.trim().to_string(),
+        })
     }
 
     /// Liệt kê các remote đã cấu hình (vd ["gdrive:", "onedrive:"]).

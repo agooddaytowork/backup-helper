@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <nav class="tabbar">
+      <button class="tabbtn active" data-tab="backup">Backup 1 chiều</button>
+      <button class="tabbtn" data-tab="v2">Đồng bộ 2 chiều + Cloud</button>
+    </nav>
+    <div id="tab-backup" class="tab-page">
     <header class="topbar">
       <div class="brand">
         <span class="dot" id="statusDot"></span>
@@ -96,7 +101,114 @@
         </div>
       </div>
     </div>
+    </div><!-- /tab-backup -->
+
+    <div id="tab-v2" class="tab-page hidden">
+      <header class="topbar">
+        <div class="brand">
+          <span class="dot on"></span>
+          <div>
+            <div class="brand-title">Đồng bộ 2 chiều &amp; Cloud</div>
+            <div class="brand-sub">Làm việc trên bản backup rồi đồng bộ ngược an toàn</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="v2UndoLast" class="btn">Hoàn tác lần gần nhất</button>
+        </div>
+      </header>
+
+      <main>
+        <!-- Cặp đồng bộ -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Cặp đồng bộ (Gốc ⇄ Bản làm việc)</h2>
+            <button id="v2AddPair" class="btn btn-sm">+ Thêm cặp</button>
+          </div>
+          <div id="v2PairList" class="pair-list"></div>
+          <p id="v2PairEmpty" class="empty">Chưa có cặp nào. Bấm “+ Thêm cặp”.</p>
+        </section>
+
+        <!-- Kết quả -->
+        <section class="card" id="v2ResultCard" style="display:none">
+          <div class="card-head"><h2 id="v2ResultTitle">Kết quả</h2></div>
+          <div id="v2Result"></div>
+        </section>
+
+        <!-- Cloud -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Cloud (rclone)</h2>
+            <button id="v2RefreshCloud" class="btn btn-sm">Làm mới</button>
+          </div>
+          <div id="v2CloudStatus" class="empty">Đang kiểm tra…</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn btn-sm v2Connect" data-provider="drive">＋ Kết nối Google Drive</button>
+            <button class="btn btn-sm v2Connect" data-provider="onedrive">＋ Kết nối OneDrive</button>
+          </div>
+          <p class="empty" style="text-align:left;font-size:12.5px">
+            Khi bấm kết nối, trình duyệt sẽ mở để đăng nhập &amp; cấp quyền. Đăng nhập xong quay lại đây bấm “Làm mới”.
+          </p>
+        </section>
+
+        <!-- Đích cloud -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Đích cloud (nơi lưu bản sao)</h2>
+            <button id="v2AddTarget" class="btn btn-sm">+ Thêm đích</button>
+          </div>
+          <div id="v2TargetList" class="pair-list"></div>
+          <p id="v2TargetEmpty" class="empty">Chưa có đích cloud. Kết nối remote rồi thêm đích.</p>
+        </section>
+      </main>
+
+      <!-- Modal thêm cặp -->
+      <div id="v2PairDlg" class="overlay hidden">
+        <div class="modal">
+          <h3>Thêm cặp đồng bộ</h3>
+          <label class="field"><span>Tên gợi nhớ</span>
+            <div class="pick"><input id="v2pName" type="text" placeholder="VD: Dự án khách A" /></div>
+          </label>
+          <label class="field"><span>Thư mục gốc (Origin)</span>
+            <div class="pick"><input id="v2pOrigin" type="text" readonly placeholder="Chọn…" />
+              <button id="v2pPickOrigin" class="btn btn-sm">Chọn</button></div>
+          </label>
+          <label class="field"><span>Bản làm việc / backup (Working — SOT)</span>
+            <div class="pick"><input id="v2pWorking" type="text" readonly placeholder="Chọn…" />
+              <button id="v2pPickWorking" class="btn btn-sm">Chọn</button></div>
+          </label>
+          <div class="modal-actions">
+            <button id="v2pCancel" class="btn">Hủy</button>
+            <button id="v2pSave" class="btn btn-primary">Thêm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal thêm đích cloud -->
+      <div id="v2TargetDlg" class="overlay hidden">
+        <div class="modal">
+          <h3>Thêm đích cloud</h3>
+          <label class="field"><span>Tên gợi nhớ</span>
+            <div class="pick"><input id="v2tName" type="text" placeholder="VD: Google Drive công ty" /></div>
+          </label>
+          <label class="field"><span>Remote (rclone)</span>
+            <div class="pick"><select id="v2tRemote" class="num" style="width:100%"></select></div>
+          </label>
+          <label class="field"><span>Thư mục trên cloud</span>
+            <div class="pick"><input id="v2tDest" type="text" placeholder="VD: backup/du-an-A" /></div>
+          </label>
+          <label class="switch-row">
+            <input type="checkbox" id="v2tMirror" />
+            <span>Mirror (xoá trên cloud khi bản làm việc xoá)<br /><small>Bỏ chọn = chỉ thêm/cập nhật (an toàn)</small></span>
+          </label>
+          <div class="modal-actions">
+            <button id="v2tCancel" class="btn">Hủy</button>
+            <button id="v2tSave" class="btn btn-primary">Thêm</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-v2 -->
 
     <script src="main.js"></script>
+    <script src="v2.js"></script>
   </body>
 </html>
