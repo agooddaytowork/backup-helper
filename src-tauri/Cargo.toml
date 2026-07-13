@@ -23,6 +23,8 @@ notify-debouncer-mini = "0.4"
 walkdir = "2"
 chrono = { version = "0.4", features = ["clock"] }
 filetime = "0.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+blake3 = "1"
 
 [profile.release]
 opt-level = "s"
