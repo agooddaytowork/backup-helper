@@ -320,16 +320,23 @@
     document.querySelectorAll(".v2Connect").forEach((b) =>
       b.addEventListener("click", async () => {
         const provider = b.dataset.provider;
-        const defName = provider === "drive" ? "gdrive" : "onedrive";
-        const name = prompt("Đặt tên cho kết nối này:", defName);
-        if (!name) return;
+        const base = provider === "drive" ? "gdrive" : "onedrive";
+        // Tự đặt tên, tránh trùng remote đã có (prompt() không chạy trong webview).
+        let name = base;
+        let i = 2;
+        while (remotes.includes(name + ":")) {
+          name = base + i;
+          i++;
+        }
         const el = $("v2CloudStatus");
-        el.innerHTML = `<span style="color:var(--amber)">Đang mở trình duyệt để đăng nhập… hoàn tất rồi quay lại.</span>`;
+        el.innerHTML = `<span style="color:var(--amber)">Đang mở trình duyệt để đăng nhập “${esc(
+          name
+        )}”… Đăng nhập &amp; cấp quyền xong, cửa sổ này sẽ tự cập nhật.</span>`;
         try {
           const msg = await invoke("v2_connect_remote", { name, provider });
-          alert(msg);
+          el.innerHTML = `<span style="color:var(--green)">${esc(msg)}</span>`;
         } catch (e) {
-          alert("Kết nối thất bại: " + e);
+          el.innerHTML = `<span style="color:var(--red)">Kết nối thất bại: ${esc(e)}</span>`;
         }
         loadCloud();
       })
