@@ -4,6 +4,11 @@
 //! Bất biến an toàn: mọi file bị ghi đè/xóa đều được cất vào version store
 //! TRƯỚC khi thay đổi; mọi thao tác được ghi journal để undo.
 
+// Một số API (list_remotes, restore_version, has...) là bề mặt để nối UI ở
+// Phase tiếp theo — cho phép chưa dùng tới trong lúc build backend.
+#![allow(dead_code)]
+
+pub mod cloud;
 pub mod db;
 pub mod diff;
 pub mod scan;

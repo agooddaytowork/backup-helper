@@ -139,7 +139,8 @@
       </div>
       <div class="callout ok"><b>Trạng thái build.</b> <b>Phase 1 (lõi engine) ĐÃ code + test (16/16 pass)</b>: metadata DB (SQLite),
       phát hiện thay đổi 2 tầng (stat + BLAKE3), diff 3 phía (đủ ma trận conflict), version store (CAS), apply nguyên tử + journal + undo + restore.
-      Quá trình test bắt được 1 bug thật (sửa cù-size trong cùng 1 giây bị bỏ sót) → đã fix bằng mtime nanosecond. <b>Phase 2 (cloud) chốt dùng rclone.</b></div>
+      Quá trình test bắt được 1 bug thật (sửa cù-size trong cùng 1 giây bị bỏ sót) → đã fix bằng mtime nanosecond.
+      <b>Phase 2: module replication rclone ĐÃ code + test</b> (fan-out đa target chạy rclone thật, 17/17 pass). Còn lại: luồng OAuth "thêm remote" + nối UI.</div>
     </section>
 
     <!-- 1 REFRAME -->
