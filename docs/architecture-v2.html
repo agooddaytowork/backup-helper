@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backup Helper — Architecture v2 (Sync &amp; Replication Fabric)</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a30;
+    --panel2: #0f1730;
+    --ink: #e6ecff;
+    --muted: #93a1c4;
+    --line: #23304f;
+    --accent: #4f8cff;
+    --accent2: #22d3a6;
+    --warn: #f5a524;
+    --danger: #ff5d6c;
+    --ok: #2dd4a7;
+    --chip: #1b2544;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, #0b1020, #0a0f1e 40%);
+    color: var(--ink);
+    font: 15px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; }
+  /* Sidebar */
+  nav {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto;
+    padding: 28px 18px; border-right: 1px solid var(--line); background: var(--panel2);
+  }
+  nav h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: .3px; }
+  nav .sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  nav a { display: block; color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 7px; font-size: 13.5px; }
+  nav a:hover { background: var(--chip); color: var(--ink); }
+  nav .grp { color: #6f7fa6; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 16px 10px 6px; }
+  /* Content */
+  main { padding: 40px 52px 120px; min-width: 0; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 30px; }
+  .tag { display: inline-block; background: var(--chip); color: var(--accent); border: 1px solid var(--line);
+         padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  h1.title { font-size: 30px; margin: 14px 0 6px; line-height: 1.2; }
+  .byline { color: var(--muted); font-size: 14px; }
+  h2 { font-size: 22px; margin: 46px 0 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+  h2 .n { color: var(--accent); font-weight: 700; margin-right: 8px; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; color: #cdd8f7; }
+  p { color: #d4ddf5; }
+  .lead { font-size: 16px; color: #c7d2ee; }
+  code { background: #0c1430; border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; font-size: 13px; color: #8fd6ff; }
+  ul, ol { padding-left: 20px; }
+  li { margin: 5px 0; }
+  strong { color: #fff; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .callout { border-left: 3px solid var(--accent); background: #0e1730; padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--danger); }
+  .callout.ok { border-color: var(--ok); }
+  .callout b { color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #0e1730; color: #b9c6ea; font-weight: 600; }
+  td.op { font-weight: 600; }
+  .c-prop { color: var(--accent2); }
+  .c-conf { color: var(--danger); font-weight: 700; }
+  .c-skip { color: var(--muted); }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11.5px; border:1px solid var(--line); background: var(--chip); color: var(--muted); }
+  .pill.build { color: var(--accent2); border-color:#1c4d40; background:#0c2019; }
+  .pill.buy { color: var(--warn); border-color:#4d3a15; background:#20180c; }
+  figure { margin: 20px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  figcaption { color: var(--muted); font-size: 12.5px; margin-top: 10px; text-align: center; }
+  svg { width: 100%; height: auto; display: block; }
+  .kpi { display:flex; gap:14px; flex-wrap:wrap; margin: 8px 0 4px; }
+  .kpi div { background:var(--chip); border:1px solid var(--line); border-radius:10px; padding:10px 14px; }
+  .kpi b { display:block; font-size:20px; color:#fff; }
+  .kpi span { font-size:12px; color:var(--muted); }
+  .phase { border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:12px 0; background:var(--panel); }
+  .phase .h { display:flex; justify-content:space-between; align-items:center; }
+  .phase .h b { font-size:15px; }
+  .phase .h span { font-size:12px; color:var(--muted); }
+  footer { color:var(--muted); font-size:12.5px; border-top:1px solid var(--line); margin-top:40px; padding-top:16px; }
+  @media (max-width: 900px){ .wrap{grid-template-columns:1fr} nav{display:none} main{padding:24px} .grid2,.grid3{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <h1>Backup Helper</h1>
+    <div class="sub">Architecture v2 — Sync &amp; Replication Fabric</div>
+    <a href="#tldr">TL;DR</a>
+    <div class="grp">Foundations</div>
+    <a href="#reframe">1 · Problem reframing</a>
+    <a href="#principles">2 · Design principles</a>
+    <a href="#topology">3 · Roles &amp; topology</a>
+    <div class="grp">The engine</div>
+    <a href="#layers">4 · Component architecture</a>
+    <a href="#detect">5 · Change detection</a>
+    <a href="#sync">6 · Bidirectional sync</a>
+    <a href="#merge">7 · Merge strategies</a>
+    <a href="#rollback">8 · Versioning &amp; rollback</a>
+    <a href="#cloud">9 · Multi-cloud fan-out</a>
+    <div class="grp">Realization</div>
+    <a href="#data">10 · Data model</a>
+    <a href="#flow">11 · End-to-end flow</a>
+    <a href="#stack">12 · Stack &amp; build-vs-buy</a>
+    <a href="#safety">13 · Safety &amp; failure</a>
+    <a href="#roadmap">14 · Roadmap</a>
+    <a href="#risks">15 · Risks &amp; decisions</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <span class="tag">ARCHITECTURE PROPOSAL · v2 · for review</span>
+      <h1 class="title">From backup tool → a safe two-way sync &amp; multi-cloud replication fabric</h1>
+      <div class="byline">Prepared as chief-architect proposal · builds on the existing Tauri + Rust codebase · <b>DRAFT — decisions needed (§15)</b></div>
+    </header>
+
+    <!-- TLDR -->
+    <section id="tldr">
+      <div class="callout ok">
+        <b>TL;DR (tiếng Việt).</b> Nhu cầu mới đã biến công cụ backup 1 chiều thành một hệ <b>đồng bộ 2 chiều có phát hiện xung đột</b> +
+        <b>nhân bản song song lên nhiều cloud</b> + <b>versioning &amp; rollback an toàn</b>. Đề xuất: giữ nguyên lõi Rust/Tauri, bổ sung
+        (1) <b>chỉ mục 3 phía</b> (origin ↔ bản làm việc ↔ baseline) để tự phát hiện thay đổi &amp; đề xuất cách gộp; (2) một
+        <b>kho phiên bản content-addressed</b> (dedup theo chunk, rất hợp file lớn) làm nền cho rollback; (3) <b>fan-out</b> lên
+        Google Drive/OneDrive/S3 qua engine đã được kiểm chứng. Nguyên tắc xuyên suốt: <b>không bao giờ ghi đè/xoá khi chưa lưu được phiên bản cũ</b>.
+      </div>
+      <div class="kpi">
+        <div><b>2-way</b><span>origin ⇄ working copy, three-way merge</span></div>
+        <div><b>N clouds</b><span>concurrent, independent replicas</span></div>
+        <div><b>0 data loss</b><span>version-before-overwrite invariant</span></div>
+        <div><b>Point-in-time</b><span>snapshot restore + undo-last-sync</span></div>
+      </div>
+      <div class="callout ok"><b>Trạng thái build.</b> <b>Phase 1 (lõi engine) ĐÃ code + test (16/16 pass)</b>: metadata DB (SQLite),
+      phát hiện thay đổi 2 tầng (stat + BLAKE3), diff 3 phía (đủ ma trận conflict), version store (CAS), apply nguyên tử + journal + undo + restore.
+      Quá trình test bắt được 1 bug thật (sửa cù-size trong cùng 1 giây bị bỏ sót) → đã fix bằng mtime nanosecond. <b>Phase 2 (cloud) chốt dùng rclone.</b></div>
+    </section>
+
+    <!-- 1 REFRAME -->
+    <h2 id="reframe"><span class="n">1</span>Problem reframing — what actually changed</h2>
+    <p class="lead">The original tool answered one question: <em>"copy changed files from A to B."</em> The new use case breaks three
+    assumptions at once, and each one changes the architecture.</p>
+    <table>
+      <tr><th>New reality (from your use case)</th><th>Assumption it breaks</th><th>Architectural consequence</th></tr>
+      <tr><td>The backup copy is <b>edited</b> while working with clients — it becomes the new source of truth.</td>
+          <td>"Destination is read-only." No longer true — <b>both sides mutate</b>.</td>
+          <td>One-way copy ⇒ <b>bidirectional sync</b> with divergence/conflict detection.</td></tr>
+      <tr><td>You want to <b>push the backup back</b> into the original folders.</td>
+          <td>"Direction is fixed A→B."</td>
+          <td>Authority can flip; need a <b>baseline</b> to compute a safe three-way merge, plus a mandatory <b>preview/dry-run</b>.</td></tr>
+      <tr><td><b>Critical client files</b> need <b>concurrent</b> off-site copies (Google Drive, OneDrive, …).</td>
+          <td>"Single destination."</td>
+          <td><b>Fan-out replication</b> with per-target queues, retries, and client-side encryption.</td></tr>
+      <tr><td>Big files, incremental.</td>
+          <td>"Whole-file copy is fine."</td>
+          <td><b>Content-defined chunking</b> so only changed chunks move — locally and to cloud.</td></tr>
+      <tr><td>"Very safe, roll back."</td>
+          <td>"Latest copy is enough."</td>
+          <td><b>Versioned, content-addressed store</b> + journaled, atomic, reversible operations.</td></tr>
+    </table>
+    <div class="callout danger"><b>The honest risk.</b> Bidirectional sync is a genuinely hard, dangerous class of software (Dropbox/Unison/Syncthing territory).
+    The value of this document is a design where <b>every destructive action is recoverable</b>, conflicts are never auto-resolved by guessing, and the
+    scary parts (reverse-sync, deletions) always go through preview + versioning.</div>
+
+    <!-- 2 PRINCIPLES -->
+    <h2 id="principles"><span class="n">2</span>Design principles (safety is the product)</h2>
+    <div class="grid2">
+      <div class="card"><h4>1 · Version-before-mutate</h4><p>No file is ever overwritten or deleted until its current bytes are captured in the version store. This single invariant is what makes "roll back" always possible.</p></div>
+      <div class="card"><h4>2 · Atomic apply</h4><p>Write to a temp file, fsync, then atomic rename. A crash mid-sync never leaves a half-written client file.</p></div>
+      <div class="card"><h4>3 · Journaled &amp; reversible</h4><p>Every operation is written to an append-only journal <em>before</em> it runs. Undo replays the journal backwards. Enables crash recovery too.</p></div>
+      <div class="card"><h4>4 · Never guess a conflict</h4><p>When both sides changed the same file, the tool <em>stops and asks</em>. Both versions are always preserved; the "loser" becomes a version, never a deletion.</p></div>
+      <div class="card"><h4>5 · Preview before reverse/delete</h4><p>Reverse-sync (backup → origin) and any deletion propagation require an explicit, human-readable plan the operator approves.</p></div>
+      <div class="card"><h4>6 · Verify by content, not clock</h4><p>mtime/size is the fast path; a content hash is the source of truth. Clock skew across NAS/cloud never causes a wrong overwrite.</p></div>
+      <div class="card"><h4>7 · Targets are independent</h4><p>A slow or failing cloud never blocks the local/NAS copy. Each replica has its own queue and state.</p></div>
+      <div class="card"><h4>8 · Confidential by default</h4><p>Client files are encrypted client-side before leaving the machine; credentials live in the OS keychain, never in config files.</p></div>
+    </div>
+
+    <!-- 3 TOPOLOGY -->
+    <h2 id="topology"><span class="n">3</span>Location roles &amp; topology</h2>
+    <p>The key clarity move: give every location an explicit <b>role</b>. Only two roles participate in the risky two-way merge; clouds are one-way replicas.</p>
+    <div class="grid3">
+      <div class="card"><h4>Origin <span class="pill">editable</span></h4><p>The original working folders on the PC. Can change (staff still edit here).</p></div>
+      <div class="card"><h4>Working copy / SOT <span class="pill">editable</span></h4><p>Local disk or NAS. The copy used to work with clients. Designated source-of-truth during client work.</p></div>
+      <div class="card"><h4>Cloud replicas <span class="pill">mirror</span></h4><p>Google Drive, OneDrive, S3… Redundant, encrypted, off-site. Disaster recovery — not merge participants.</p></div>
+    </div>
+    <figure>
+      <svg viewBox="0 0 900 300" role="img" aria-label="Topology diagram">
+        <defs>
+          <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#4f8cff"/></marker>
+          <marker id="ah2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#22d3a6"/></marker>
+        </defs>
+        <!-- origin -->
+        <rect x="30" y="110" width="180" height="80" rx="12" fill="#101a34" stroke="#2a63c9"/>
+        <text x="120" y="145" fill="#e6ecff" font-size="15" text-anchor="middle" font-weight="700">Origin folders</text>
+        <text x="120" y="167" fill="#93a1c4" font-size="12" text-anchor="middle">PC · editable</text>
+        <!-- working -->
+        <rect x="360" y="100" width="200" height="100" rx="12" fill="#0c2019" stroke="#1c8f6f"/>
+        <text x="460" y="135" fill="#eafff7" font-size="15" text-anchor="middle" font-weight="700">Working copy (SOT)</text>
+        <text x="460" y="157" fill="#7fd8bd" font-size="12" text-anchor="middle">Local disk / NAS</text>
+        <text x="460" y="176" fill="#7fd8bd" font-size="12" text-anchor="middle">+ version store</text>
+        <!-- two-way arrow -->
+        <line x1="215" y1="150" x2="352" y2="150" stroke="#4f8cff" stroke-width="2.5" marker-end="url(#ah)" marker-start="url(#ah)"/>
+        <text x="283" y="140" fill="#4f8cff" font-size="12" text-anchor="middle">two-way</text>
+        <text x="283" y="176" fill="#6f7fa6" font-size="11" text-anchor="middle">merge + conflicts</text>
+        <!-- clouds -->
+        <rect x="700" y="30" width="170" height="56" rx="10" fill="#141d38" stroke="#3a4a75"/>
+        <text x="785" y="63" fill="#e6ecff" font-size="13" text-anchor="middle">Google Drive</text>
+        <rect x="700" y="122" width="170" height="56" rx="10" fill="#141d38" stroke="#3a4a75"/>
+        <text x="785" y="155" fill="#e6ecff" font-size="13" text-anchor="middle">OneDrive</text>
+        <rect x="700" y="214" width="170" height="56" rx="10" fill="#141d38" stroke="#3a4a75"/>
+        <text x="785" y="247" fill="#e6ecff" font-size="13" text-anchor="middle">S3 / other</text>
+        <!-- fan-out arrows (one-way, encrypted) -->
+        <line x1="565" y1="140" x2="695" y2="60"  stroke="#22d3a6" stroke-width="2" marker-end="url(#ah2)"/>
+        <line x1="565" y1="150" x2="695" y2="150" stroke="#22d3a6" stroke-width="2" marker-end="url(#ah2)"/>
+        <line x1="565" y1="160" x2="695" y2="242" stroke="#22d3a6" stroke-width="2" marker-end="url(#ah2)"/>
+        <text x="628" y="205" fill="#22d3a6" font-size="11" text-anchor="middle">encrypted · concurrent</text>
+      </svg>
+      <figcaption>Two locations negotiate a safe two-way merge; the SOT fans out encrypted one-way replicas to N clouds in parallel.</figcaption>
+    </figure>
+
+    <!-- 4 LAYERS -->
+    <h2 id="layers"><span class="n">4</span>Component architecture</h2>
+    <p>Layered so the dangerous logic (sync/merge) is isolated from storage and transport, and the transport (cloud) can be swapped without touching sync.</p>
+    <figure>
+      <svg viewBox="0 0 900 470" role="img" aria-label="Layered architecture">
+        <!-- UI layer -->
+        <rect x="30" y="20" width="840" height="70" rx="10" fill="#101a34" stroke="#2a63c9"/>
+        <text x="45" y="42" fill="#8fb4ff" font-size="12">UI LAYER · Tauri webview (Vietnamese, minimal)</text>
+        <g fill="#0c1430" stroke="#23304f">
+          <rect x="45" y="52" width="180" height="28" rx="6"/><rect x="235" y="52" width="200" height="28" rx="6"/>
+          <rect x="445" y="52" width="190" height="28" rx="6"/><rect x="645" y="52" width="210" height="28" rx="6"/>
+        </g>
+        <g fill="#cdd8f7" font-size="12" text-anchor="middle">
+          <text x="135" y="71">Dashboard</text><text x="335" y="71">Conflict &amp; merge review</text>
+          <text x="540" y="71">Rollback timeline</text><text x="750" y="71">Targets &amp; OAuth</text>
+        </g>
+
+        <!-- Sync core -->
+        <rect x="30" y="110" width="840" height="110" rx="10" fill="#0c2019" stroke="#1c8f6f"/>
+        <text x="45" y="132" fill="#7fd8bd" font-size="12">SYNC CORE (Rust) · the hard, isolated part</text>
+        <g fill="#0e241c" stroke="#1c8f6f">
+          <rect x="45" y="142" width="190" height="64" rx="7"/><rect x="245" y="142" width="190" height="64" rx="7"/>
+          <rect x="445" y="142" width="190" height="64" rx="7"/><rect x="645" y="142" width="210" height="64" rx="7"/>
+        </g>
+        <g fill="#eafff7" font-size="12.5" text-anchor="middle" font-weight="600">
+          <text x="140" y="170">Scanner / Indexer</text><text x="340" y="170">Diff &amp; Merge engine</text>
+          <text x="540" y="170">Sync orchestrator</text><text x="750" y="170">Scheduler</text>
+        </g>
+        <g fill="#7fd8bd" font-size="10.5" text-anchor="middle">
+          <text x="140" y="190">fs-events + scan</text><text x="340" y="190">three-way, conflicts</text>
+          <text x="540" y="190">plan · atomic · verify</text><text x="750" y="190">realtime / periodic / manual</text>
+        </g>
+
+        <!-- Storage core -->
+        <rect x="30" y="240" width="410" height="110" rx="10" fill="#101a34" stroke="#3a4a75"/>
+        <text x="45" y="262" fill="#8fb4ff" font-size="12">STORAGE CORE</text>
+        <g fill="#0c1430" stroke="#23304f">
+          <rect x="45" y="272" width="120" height="64" rx="7"/><rect x="175" y="272" width="120" height="64" rx="7"/><rect x="305" y="272" width="120" height="64" rx="7"/>
+        </g>
+        <g fill="#cdd8f7" font-size="12" text-anchor="middle" font-weight="600">
+          <text x="105" y="298">Chunker</text><text x="235" y="298">CAS +</text><text x="365" y="298">Snapshot</text>
+        </g>
+        <g fill="#93a1c4" font-size="10.5" text-anchor="middle">
+          <text x="105" y="316">FastCDC</text><text x="235" y="316">versions</text><text x="365" y="316">DB (SQLite)</text>
+        </g>
+        <text x="235" y="332" fill="#93a1c4" font-size="10.5" text-anchor="middle">BLAKE3 · dedup</text>
+
+        <!-- Replication -->
+        <rect x="460" y="240" width="410" height="110" rx="10" fill="#141d38" stroke="#3a4a75"/>
+        <text x="475" y="262" fill="#8fb4ff" font-size="12">REPLICATION · pluggable targets</text>
+        <g fill="#0c1430" stroke="#23304f">
+          <rect x="475" y="272" width="180" height="64" rx="7"/><rect x="665" y="272" width="190" height="64" rx="7"/>
+        </g>
+        <g fill="#cdd8f7" font-size="12" text-anchor="middle" font-weight="600">
+          <text x="565" y="298">Local / NAS adapter</text><text x="760" y="298">Cloud sidecar</text>
+        </g>
+        <g fill="#93a1c4" font-size="10.5" text-anchor="middle">
+          <text x="565" y="316">filesystem</text><text x="760" y="316">rclone/Kopia · GDrive, OneDrive, S3</text>
+        </g>
+        <text x="760" y="332" fill="#93a1c4" font-size="10.5" text-anchor="middle">queue · retry · encrypt</text>
+
+        <!-- Cross cutting -->
+        <rect x="30" y="370" width="840" height="60" rx="10" fill="#0f1730" stroke="#23304f"/>
+        <text x="45" y="392" fill="#93a1c4" font-size="12">CROSS-CUTTING</text>
+        <g fill="#cdd8f7" font-size="12" text-anchor="middle">
+          <text x="180" y="410">Append-only journal / audit log</text>
+          <text x="460" y="410">OS keychain (secrets)</text>
+          <text x="720" y="410">Integrity scrub &amp; health</text>
+        </g>
+      </svg>
+      <figcaption>UI ⟶ Sync core ⟶ (Storage core ‖ Replication), with journal / secrets / integrity as cross-cutting concerns.</figcaption>
+    </figure>
+
+    <!-- 5 DETECT -->
+    <h2 id="detect"><span class="n">5</span>Change detection for big files</h2>
+    <p>Two-tier detection keeps it cheap for huge files while staying correct:</p>
+    <ol>
+      <li><b>Fast path — stat.</b> If <code>size</code> and <code>mtime</code> are unchanged vs the index, assume unchanged (current behaviour, kept).</li>
+      <li><b>Truth path — content.</b> When stat differs (or on demand / on verify), the file is run through <b>content-defined chunking (FastCDC)</b> and each chunk hashed with <b>BLAKE3</b>. The file's identity is the list of chunk hashes.</li>
+    </ol>
+    <div class="callout"><b>Why chunking matters here.</b> A 2&nbsp;GB client file where one page changed produces a handful of changed chunks.
+    Only those chunks are versioned locally and uploaded to each cloud. This is what makes "incremental" real for big files and for metered cloud bandwidth — and it makes keeping many rollback versions almost free (unchanged chunks are shared).</div>
+
+    <!-- 6 SYNC -->
+    <h2 id="sync"><span class="n">6</span>Bidirectional sync — the three-way algorithm</h2>
+    <p>Correct two-way sync is impossible with just "newest wins." You need a <b>baseline</b>: the last state both sides agreed on. Comparing each
+    side to the baseline tells you <em>who changed what</em>, and only that lets you detect a true conflict.</p>
+    <ol>
+      <li>Scan <b>Origin (A)</b> and <b>Working (B)</b> → current chunk-hash indexes.</li>
+      <li>Load <b>Baseline (S)</b> — the committed common state from the last successful sync.</li>
+      <li>For every path, classify the change on each side vs S: <span class="pill">none</span> <span class="pill">created</span> <span class="pill">modified</span> <span class="pill">deleted</span>.</li>
+      <li>Apply the decision matrix below → a <b>plan</b> of operations (or conflicts).</li>
+      <li><b>Version</b> every to-be-overwritten/deleted file, then <b>apply atomically</b>, then <b>verify</b> by hash.</li>
+      <li>Commit the new baseline; fan out changes to clouds; write the journal.</li>
+    </ol>
+    <h3>Conflict &amp; propagation matrix</h3>
+    <table>
+      <tr><th>Origin vs baseline</th><th>Working vs baseline</th><th>Decision</th></tr>
+      <tr><td>none</td><td>none</td><td class="op c-skip">skip</td></tr>
+      <tr><td>modified</td><td>none</td><td class="op c-prop">Origin → Working</td></tr>
+      <tr><td>none</td><td>modified</td><td class="op c-prop">Working → Origin (reverse-sync)</td></tr>
+      <tr><td>modified</td><td>modified <em>(same content)</em></td><td class="op c-skip">converged — just advance baseline</td></tr>
+      <tr><td>modified</td><td>modified <em>(different)</em></td><td class="op c-conf">CONFLICT → suggest merge</td></tr>
+      <tr><td>created</td><td>none</td><td class="op c-prop">Origin → Working</td></tr>
+      <tr><td>none</td><td>created</td><td class="op c-prop">Working → Origin</td></tr>
+      <tr><td>created</td><td>created <em>(different)</em></td><td class="op c-conf">CONFLICT (both new)</td></tr>
+      <tr><td>deleted</td><td>none</td><td class="op c-prop">delete Working <em>(version first)</em></td></tr>
+      <tr><td>none</td><td>deleted</td><td class="op c-prop">delete Origin <em>(version first)</em></td></tr>
+      <tr><td>deleted</td><td>modified</td><td class="op c-conf">CONFLICT (delete-vs-edit → keep edit by default)</td></tr>
+      <tr><td>modified</td><td>deleted</td><td class="op c-conf">CONFLICT (edit-vs-delete → keep edit by default)</td></tr>
+    </table>
+    <div class="callout ok"><b>"Auto-detect changes and suggest a merge."</b> This matrix <em>is</em> that feature: when you come back from working with a client,
+    the tool shows exactly which files diverged, classifies each as safe-propagate or conflict, and proposes the resolution — you approve, it applies.</div>
+
+    <!-- 7 MERGE -->
+    <h2 id="merge"><span class="n">7</span>Merge strategies (what "suggest merging" means per file type)</h2>
+    <div class="grid2">
+      <div class="card"><h4>Text / code / config</h4><p>Automatic <b>3-way merge (diff3)</b> against the baseline. Non-overlapping edits merge silently; overlapping hunks are flagged for manual resolution in the UI.</p></div>
+      <div class="card"><h4>Big / binary / Office / CAD / media</h4><p>No safe content merge exists. The tool offers <b>Keep working</b>, <b>Keep origin</b>, or <b>Keep both (auto-rename)</b>. The non-chosen side is retained as a <em>version</em>, never lost. "Open both to compare" is one click.</p></div>
+      <div class="card"><h4>Batch rules</h4><p>Operator can set defaults, e.g. "for <code>.docx</code> prefer the working copy," or "delete-vs-edit → always keep the edit," to resolve dozens of conflicts at once — with a preview of what each rule will do.</p></div>
+      <div class="card"><h4>Default posture</h4><p>When in doubt, <b>keep both</b>. The system's bias is always toward preserving data over cleanliness; cleanup is a later, reversible step.</p></div>
+    </div>
+
+    <!-- 8 ROLLBACK -->
+    <h2 id="rollback"><span class="n">8</span>Versioning &amp; rollback</h2>
+    <p>Rollback is not a feature bolted on — it falls out of the <b>content-addressed version store (CAS)</b> plus the <b>operation journal</b>.</p>
+    <div class="grid3">
+      <div class="card"><h4>Per-file history</h4><p>Every version of a file is a list of chunk hashes + timestamp + origin. Restore any point from a timeline. Cheap because chunks dedupe.</p></div>
+      <div class="card"><h4>Point-in-time snapshot</h4><p>Each successful sync writes a labelled <b>checkpoint</b> (a manifest of the whole tree). Restore the entire folder to "yesterday 5pm," Time-Machine style.</p></div>
+      <div class="card"><h4>Undo last sync</h4><p>The journal is replayed in reverse: every overwrite/delete is restored from its pre-image version. One-click, atomic.</p></div>
+      <div class="card"><h4>Trash, not delete</h4><p>Deletions go to a retention-bounded trash (e.g. keep 30 days), never an immediate hard delete.</p></div>
+      <div class="card"><h4>Retention policy</h4><p>Configurable GRFA-style (keep last N, daily for D days, weekly for W weeks). Garbage-collect unreferenced chunks safely.</p></div>
+      <div class="card"><h4>Verify &amp; scrub</h4><p>Periodic re-hash of stored chunks detects bit-rot; cloud replicas are checked against expected hashes.</p></div>
+    </div>
+    <div class="callout warn"><b>Note on the 2-day audit log.</b> The existing "detailed log, last 2 days" requirement stays for <em>operational audit</em>. It is
+    separate from <em>version retention</em> (weeks/months of file history). Two different clocks, two different purposes — don't conflate them.</div>
+
+    <!-- 9 CLOUD -->
+    <h2 id="cloud"><span class="n">9</span>Multi-cloud fan-out</h2>
+    <p>Each cloud is an <b>independent, one-way replica</b> fed from the SOT/CAS. Independence is the safety property: OneDrive being throttled must never
+    stall the NAS copy or block your client work.</p>
+    <ul>
+      <li><b>Per-target queue &amp; state</b> — each provider has its own work queue, cursor, retry/backoff, and health (last-ok, lag, error).</li>
+      <li><b>Changed-chunks only</b> — replication uploads the same chunk deltas computed once, not whole files.</li>
+      <li><b>Client-side encryption</b> — critical client files are encrypted before upload (repository-level crypto). The cloud never sees plaintext.</li>
+      <li><b>Concurrency with backpressure</b> — bounded parallel transfers; large files stream, don't buffer to RAM (keeps the "lightweight" promise).</li>
+      <li><b>Restore from any replica</b> — a cloud replica is a full restore source if local disk/NAS dies.</li>
+    </ul>
+    <div class="callout ok"><b>Quyết định đã chốt: dùng rclone.</b> File hiển thị/chia sẻ trực tiếp được trên Google Drive/OneDrive (không mã hoá kín repo),
+    để tiện làm việc &amp; gửi khách. rclone là 1 binary Go, tự lo OAuth + resumable upload + backoff rate-limit + 70 provider. Rollback/versioning
+    ta đã tự làm ở Phase 1 (CAS), nên rclone chỉ đóng vai <b>lớp truyền tải</b>.</div>
+
+    <h3>Cách tích hợp rclone (cụ thể)</h3>
+    <ul>
+      <li><b>OAuth desktop</b> — Authorization Code + PKCE, loopback redirect: app mở trình duyệt → user đồng ý → redirect về <code>http://127.0.0.1:&lt;port&gt;/callback</code> → app bắt code → đổi token. rclone <b>có sẵn client_id</b> cho Google/OneDrive nên không cần đăng ký app hay dính "app verification" để bắt đầu.</li>
+      <li><b>Điều khiển qua daemon</b> — spawn <code>rclone rcd --rc-addr 127.0.0.1:5572</code> (sidecar ẩn); Rust gọi HTTP: <code>sync/copy</code>, <code>operations/copyfile</code>, <code>job/status</code>, <code>core/stats</code>.</li>
+      <li><b>Fan-out</b> — mỗi cloud là 1 remote (<code>gdrive:</code>, <code>onedrive:</code>) + 1 hàng đợi riêng trong Rust. Engine tính "file nào đổi" một lần từ metadata DB rồi đẩy vào từng hàng đợi. OneDrive lag không chặn GDrive.</li>
+      <li><b>Bảo mật token</b> — <code>rclone.conf</code> mã hoá bằng config password; password cất trong OS keychain.</li>
+      <li><b>Khôi phục</b> — vì file ở dạng thường trên Drive, mất máy thì kéo thẳng từ Drive về cũng được (không phụ thuộc app).</li>
+    </ul>
+    <div class="callout warn"><b>Bẫy Win7 (nếu sau này hạ nền tảng).</b> rclone bản mới (build Go ≥1.21) đã bỏ Win7 → nếu cần chạy Win7 phải <b>ghim bản rclone cũ hơn</b> còn hỗ trợ. Không ảnh hưởng Win10+/mac/Linux.</div>
+
+    <!-- 10 DATA MODEL -->
+    <h2 id="data"><span class="n">10</span>Data model (snapshot DB — SQLite)</h2>
+    <table>
+      <tr><th>Table</th><th>Purpose / key columns</th></tr>
+      <tr><td><code>locations</code></td><td>id, role (<code>origin|working|cloud</code>), path/remote, encryption key ref</td></tr>
+      <tr><td><code>files</code></td><td>location_id, rel_path, size, mtime, content_hash, deleted — the live index per location</td></tr>
+      <tr><td><code>baseline</code></td><td>pair_id, rel_path, content_hash — last agreed common state (the heart of three-way merge)</td></tr>
+      <tr><td><code>blobs</code></td><td>chunk_hash (PK), size, refcount, location in CAS — content-addressed dedup store</td></tr>
+      <tr><td><code>file_chunks</code></td><td>version_id, offset, chunk_hash — reconstructs a file from chunks</td></tr>
+      <tr><td><code>versions</code></td><td>id, rel_path, content_hash, created_at, source, op — per-file history for rollback</td></tr>
+      <tr><td><code>checkpoints</code></td><td>id, label, ts, tree_manifest — point-in-time snapshots</td></tr>
+      <tr><td><code>operations</code></td><td>id, ts, type, path, pre_image_version, status — append-only journal (undo + crash recovery)</td></tr>
+      <tr><td><code>conflicts</code></td><td>id, pair_id, rel_path, origin_ver, working_ver, status, resolution</td></tr>
+      <tr><td><code>replica_state</code></td><td>target_id, cursor, last_ok_ts, lag, error — per-cloud independent state</td></tr>
+    </table>
+
+    <!-- 11 FLOW -->
+    <h2 id="flow"><span class="n">11</span>End-to-end flow: "back from client work"</h2>
+    <figure>
+      <svg viewBox="0 0 900 210" role="img" aria-label="Sequence flow">
+        <defs><marker id="a3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8fb4ff"/></marker></defs>
+        <g font-size="12" fill="#cdd8f7" text-anchor="middle">
+          <rect x="20"  y="30" width="120" height="44" rx="8" fill="#0c2019" stroke="#1c8f6f"/><text x="80"  y="57">1 · Scan A,B,S</text>
+          <rect x="170" y="30" width="120" height="44" rx="8" fill="#0c2019" stroke="#1c8f6f"/><text x="230" y="52">2 · Diff</text><text x="230" y="66" font-size="10" fill="#7fd8bd">classify</text>
+          <rect x="320" y="30" width="130" height="44" rx="8" fill="#101a34" stroke="#2a63c9"/><text x="385" y="52">3 · Plan +</text><text x="385" y="66" font-size="10" fill="#8fb4ff">conflict review</text>
+          <rect x="480" y="30" width="120" height="44" rx="8" fill="#101a34" stroke="#2a63c9"/><text x="540" y="52">4 · Version</text><text x="540" y="66" font-size="10" fill="#8fb4ff">pre-images</text>
+          <rect x="630" y="30" width="120" height="44" rx="8" fill="#101a34" stroke="#2a63c9"/><text x="690" y="52">5 · Apply</text><text x="690" y="66" font-size="10" fill="#8fb4ff">atomic+verify</text>
+          <rect x="780" y="30" width="100" height="44" rx="8" fill="#0f1730" stroke="#23304f"/><text x="830" y="52">6 · Commit</text><text x="830" y="66" font-size="10" fill="#93a1c4">baseline</text>
+        </g>
+        <g stroke="#8fb4ff" stroke-width="2" marker-end="url(#a3)">
+          <line x1="140" y1="52" x2="168" y2="52"/><line x1="290" y1="52" x2="318" y2="52"/>
+          <line x1="450" y1="52" x2="478" y2="52"/><line x1="600" y1="52" x2="628" y2="52"/><line x1="750" y1="52" x2="778" y2="52"/>
+        </g>
+        <!-- fan out -->
+        <rect x="630" y="130" width="250" height="44" rx="8" fill="#141d38" stroke="#3a4a75"/>
+        <text x="755" y="152" font-size="12" fill="#cdd8f7" text-anchor="middle">7 · Fan-out to clouds (async)</text>
+        <text x="755" y="167" font-size="10" fill="#22d3a6" text-anchor="middle">changed chunks · encrypted · per-target queue</text>
+        <line x1="690" y1="74" x2="720" y2="128" stroke="#22d3a6" stroke-width="2" marker-end="url(#a3)"/>
+        <text x="250" y="150" font-size="11.5" fill="#93a1c4">Steps 1–3 are read-only &amp; reversible; nothing on disk changes until you approve the plan at step 3.</text>
+      </svg>
+      <figcaption>Read-only analysis → human approval → version → atomic apply → commit → async cloud fan-out.</figcaption>
+    </figure>
+
+    <!-- 12 STACK -->
+    <h2 id="stack"><span class="n">12</span>Technology stack &amp; build-vs-buy</h2>
+    <table>
+      <tr><th>Concern</th><th>Choice</th><th>Build / Buy</th><th>Why</th></tr>
+      <tr><td>App shell / UI</td><td>Tauri v2 + Rust (existing)</td><td><span class="pill build">keep</span></td><td>Already lightweight, cross-platform, Vietnamese UI in place.</td></tr>
+      <tr><td>Hashing</td><td>BLAKE3</td><td><span class="pill build">build</span></td><td>Very fast, parallel, ideal for big files.</td></tr>
+      <tr><td>Chunking</td><td>FastCDC (Rust crate)</td><td><span class="pill build">build</span></td><td>Content-defined → stable dedup across edits.</td></tr>
+      <tr><td>Snapshot DB</td><td><b>SQLite (rusqlite, bundled)</b> — đã chọn</td><td><span class="pill build">build ✓</span></td><td>1 máy → không cần DB phân tán. Turso/libSQL để dành cửa nâng cấp nếu sau này đa máy (giữ nguyên schema).</td></tr>
+      <tr><td>Versioning + rollback (CAS)</td><td>Custom (BLAKE3 + CAS) — <b>đã build Phase 1</b></td><td><span class="pill build">build ✓</span></td><td>Version-before-overwrite + journal + undo + restore. Đã có test.</td></tr>
+      <tr><td>Two-way sync + merge</td><td>Custom (Unison-style) — <b>đã build Phase 1</b></td><td><span class="pill build">build ✓</span></td><td>Lõi khác biệt, khớp UX conflict. Đã có test đủ ma trận.</td></tr>
+      <tr><td><b>Multi-cloud transport</b></td><td><b>rclone sidecar</b> — đã chọn</td><td><span class="pill buy">buy / embed</span></td><td>OAuth + resumable + 70 provider. File dạng thường trên Drive (xem/share trực tiếp).</td></tr>
+      <tr><td>Secrets</td><td>OS keychain (Keychain/DPAPI/libsecret)</td><td><span class="pill build">build</span></td><td>Never store cloud tokens in plaintext config.</td></tr>
+    </table>
+    <div class="callout"><b>Nguyên tắc đã áp dụng.</b> Tự build phần khác biệt (bộ não sync/merge + version store — đã xong Phase 1);
+    mượn <em>lớp truyền tải cloud</em> (rclone). Đặt abstraction để có thể thay engine truyền tải về sau (vd Kopia) mà không đụng lõi sync.</div>
+
+    <!-- 13 SAFETY -->
+    <h2 id="safety"><span class="n">13</span>Safety &amp; failure handling</h2>
+    <div class="grid2">
+      <div class="card"><h4>Crash mid-sync</h4><p>Journal + atomic rename ⇒ on restart, incomplete ops are rolled back from pre-images; the tree is always in a consistent state.</p></div>
+      <div class="card"><h4>File in use / locked</h4><p>Detect open handles; skip &amp; retry rather than copy a torn file. Report in the plan.</p></div>
+      <div class="card"><h4>Disk full / quota</h4><p>Pre-flight space check; transfers are staged, so a full target fails cleanly without corrupting existing data.</p></div>
+      <div class="card"><h4>Clock skew (NAS/cloud)</h4><p>Content hash is authoritative; mtime is only a hint. No wrong overwrite from a bad clock.</p></div>
+      <div class="card"><h4>Accidental mass-delete</h4><p>Deletion propagation is capped &amp; previewed ("about to delete 4,213 files — confirm?"); everything lands in trash first.</p></div>
+      <div class="card"><h4>Cloud outage</h4><p>Replica queue buffers; local work continues; catches up on reconnect. Health dashboard shows lag.</p></div>
+    </div>
+
+    <!-- 14 ROADMAP -->
+    <h2 id="roadmap"><span class="n">14</span>Phased roadmap</h2>
+    <div class="phase"><div class="h"><b>Phase 0 — Harden what exists</b><span>current tool</span></div>
+      <p>Keep the one-way incremental backup shipping. Add the version-before-overwrite store + trash. Immediate safety win, no sync risk yet.</p></div>
+    <div class="phase"><div class="h"><b>Phase 1 — Two-way sync (local/NAS only)</b><span>the core</span></div>
+      <p>Baseline index, three-way diff, conflict detection &amp; review UI, atomic apply, undo-last-sync, per-file history. This delivers "work on the backup, then safely sync back."</p></div>
+    <div class="phase"><div class="h"><b>Phase 2 — Multi-cloud replication</b><span>resilience</span></div>
+      <p>Embed Kopia/rclone; Google Drive + OneDrive first; client-side encryption; per-target health; restore-from-cloud.</p></div>
+    <div class="phase"><div class="h"><b>Phase 3 — Advanced merge &amp; restore</b><span>polish</span></div>
+      <p>diff3 text merge, batch conflict rules, point-in-time tree restore, retention policies, integrity scrub, scheduling policies per pair.</p></div>
+
+    <!-- 15 RISKS -->
+    <h2 id="risks"><span class="n">15</span>Risks &amp; decisions I need from you</h2>
+    <div class="callout danger"><b>Top risk.</b> Bidirectional sync + reverse-writing into the original folders is where data loss lives. The design mitigates it with
+    preview + versioning + journal, but it raises the engineering bar (and testing burden) substantially versus the current one-way tool.</div>
+    <div class="callout ok"><b>Đã chốt trong buổi làm việc:</b>
+      <ul>
+        <li><b>Quy mô:</b> 1 máy backup → dùng <b>SQLite</b> (không Turso).</li>
+        <li><b>Cloud:</b> <b>rclone</b> — file dạng thường, xem/share trực tiếp trên Drive (không mã hoá kín).</li>
+        <li><b>Cloud là replica 1 chiều</b>, không edit trực tiếp trên Drive.</li>
+        <li><b>GUI:</b> giữ <b>Tauri</b> (Win10+); nếu sau này cần Win7/8 thì pivot sang Slint (lõi Rust tái dùng).</li>
+        <li><b>Conflict posture:</b> "giữ cả hai, không mất dữ liệu" làm mặc định.</li>
+      </ul>
+    </div>
+    <p>Còn lại cần bạn cho biết khi làm Phase 2:</p>
+    <ol>
+      <li><b>Version retention</b> — rollback cần lùi bao xa (30 ngày? 1 năm?) → quyết định dung lượng kho CAS.</li>
+      <li><b>Danh sách cloud ưu tiên</b> — Google Drive + OneDrive trước, có cần thêm S3/khác không?</li>
+      <li><b>Nối UI</b> — màn hình review conflict &amp; timeline rollback trong Tauri (chưa build).</li>
+    </ol>
+
+    <footer>
+      Backup Helper — Architecture v2 · draft for review. Nothing here is built yet; this proposes the design and the decisions.
+      Reply with the §15 answers and I'll turn the agreed slice into an implementation plan.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
