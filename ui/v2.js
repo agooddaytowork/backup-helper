@@ -8,17 +8,16 @@
   let remotes = [];
   let cloudLoaded = false;
 
-  // ---------- Tabs ----------
-  document.querySelectorAll(".tabbtn").forEach((b) =>
-    b.addEventListener("click", () => {
-      document.querySelectorAll(".tabbtn").forEach((x) => x.classList.remove("active"));
-      b.classList.add("active");
-      const tab = b.dataset.tab;
-      $("tab-backup").classList.toggle("hidden", tab !== "backup");
-      $("tab-v2").classList.toggle("hidden", tab !== "v2");
-      if (tab === "v2" && !cloudLoaded) loadCloud();
-    })
-  );
+  // ---------- Chuyển giữa chế độ đơn giản <-> nâng cao ----------
+  function showAdvanced(on) {
+    $("tab-backup").classList.toggle("hidden", on);
+    $("tab-v2").classList.toggle("hidden", !on);
+    if (on && !cloudLoaded) loadCloud();
+  }
+  const advBtn = $("btnAdvanced");
+  if (advBtn) advBtn.addEventListener("click", () => showAdvanced(true));
+  const backBtn = $("btnBackSimple");
+  if (backBtn) backBtn.addEventListener("click", () => showAdvanced(false));
 
   // ---------- Format helpers ----------
   function formatOp(op) {

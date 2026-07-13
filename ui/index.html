@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <nav class="tabbar">
-      <button class="tabbtn active" data-tab="backup">Backup 1 chiều</button>
-      <button class="tabbtn" data-tab="v2">Đồng bộ 2 chiều + Cloud</button>
-    </nav>
     <div id="tab-backup" class="tab-page">
     <header class="topbar">
       <div class="brand">
@@ -23,6 +19,7 @@
       <div class="actions">
         <button id="btnToggle" class="btn">Tạm dừng</button>
         <button id="btnBackupNow" class="btn btn-primary">Sao lưu ngay</button>
+        <button id="btnAdvanced" class="btn" title="Đồng bộ 2 chiều, cloud, hoàn tác">Nâng cao ▸</button>
       </div>
     </header>
 
@@ -113,6 +110,7 @@
           </div>
         </div>
         <div class="actions">
+          <button id="btnBackSimple" class="btn">◂ Chế độ đơn giản</button>
           <button id="v2UndoLast" class="btn">Hoàn tác lần gần nhất</button>
         </div>
       </header>
