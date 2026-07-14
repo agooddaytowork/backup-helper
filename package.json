@@ -1,7 +1,7 @@
 {
   "name": "backup-helper",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "App sao lưu file tự động cho Windows, macOS, Linux",
   "scripts": {
     "tauri": "tauri",
