@@ -126,6 +126,18 @@
           <p id="v2PairEmpty" class="empty">Chưa có cặp nào. Bấm “+ Thêm cặp”.</p>
         </section>
 
+        <!-- Tự động -->
+        <section class="card">
+          <div class="card-head"><h2>Tự động đồng bộ &amp; đẩy cloud</h2></div>
+          <label class="switch-row">
+            <input type="checkbox" id="v2Auto" />
+            <span>Tự động chạy định kỳ (đồng bộ 2 chiều an toàn + đẩy lên cloud). Xung đột vẫn để bạn quyết định thủ công.</span>
+          </label>
+          <div class="mode-row" style="margin-top:8px">
+            <label class="radio"><span>Mỗi <input type="number" id="v2Interval" min="1" value="30" class="num" /> phút</span></label>
+          </div>
+        </section>
+
         <!-- Kết quả -->
         <section class="card" id="v2ResultCard" style="display:none">
           <div class="card-head"><h2 id="v2ResultTitle">Kết quả</h2></div>

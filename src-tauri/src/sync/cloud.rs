@@ -92,6 +92,13 @@ impl Rclone {
 
     fn base_cmd(&self) -> Command {
         let mut cmd = Command::new(&self.bin);
+        // Windows: chạy rclone ẩn, không bật cửa sổ console đen.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
         if let Some(cfg) = &self.config {
             cmd.arg("--config").arg(cfg);
         }

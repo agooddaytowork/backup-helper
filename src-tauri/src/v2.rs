@@ -18,7 +18,7 @@ pub struct V2Pair {
     pub working: String,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct V2Config {
     #[serde(default)]
     pub pairs: Vec<V2Pair>,
@@ -26,6 +26,27 @@ pub struct V2Config {
     pub targets: Vec<CloudTarget>,
     #[serde(default)]
     pub last_run: Option<String>,
+    /// Tự động đồng bộ + đẩy cloud định kỳ.
+    #[serde(default)]
+    pub auto: bool,
+    #[serde(default = "d_interval")]
+    pub interval_minutes: u64,
+}
+
+fn d_interval() -> u64 {
+    30
+}
+
+impl Default for V2Config {
+    fn default() -> Self {
+        V2Config {
+            pairs: vec![],
+            targets: vec![],
+            last_run: None,
+            auto: false,
+            interval_minutes: 30,
+        }
+    }
 }
 
 pub struct SyncManager {
@@ -384,6 +405,44 @@ pub async fn v2_connect_remote(state: St<'_>, name: String, provider: String) ->
     } else {
         Err(res.output)
     }
+}
+
+#[tauri::command]
+pub fn v2_set_auto(state: St, auto: bool, interval_minutes: u64) -> V2Config {
+    let mut m = state.lock().unwrap();
+    m.cfg.auto = auto;
+    m.cfg.interval_minutes = interval_minutes.max(1);
+    m.save();
+    m.cfg.clone()
+}
+
+/// Luồng nền: định kỳ chạy đồng bộ + đẩy cloud cho mọi cặp (nếu bật tự động).
+/// Xung đột KHÔNG tự xử lý — vẫn để người dùng quyết định.
+pub fn start_scheduler(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        let interval = {
+            let st = app.state::<Mutex<SyncManager>>();
+            let m = st.lock().unwrap();
+            m.cfg.interval_minutes.max(1)
+        };
+        std::thread::sleep(std::time::Duration::from_secs(interval * 60));
+
+        let st = app.state::<Mutex<SyncManager>>();
+        let (auto, ids) = {
+            let m = st.lock().unwrap();
+            (
+                m.cfg.auto,
+                m.cfg.pairs.iter().map(|p| p.id.clone()).collect::<Vec<_>>(),
+            )
+        };
+        if !auto {
+            continue;
+        }
+        for id in ids {
+            let mut m = st.lock().unwrap();
+            let _ = m.apply(&id); // apply đã gồm cả local + fan-out cloud
+        }
+    });
 }
 
 /// Khởi tạo state v2 trong setup của Tauri.

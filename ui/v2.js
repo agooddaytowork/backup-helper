@@ -343,6 +343,19 @@
     );
   }
 
+  function renderAuto() {
+    $("v2Auto").checked = !!cfg.auto;
+    $("v2Interval").value = cfg.interval_minutes || 30;
+  }
+  async function saveAuto() {
+    const interval = Math.max(1, parseInt($("v2Interval").value || "30", 10));
+    cfg = await invoke("v2_set_auto", { auto: $("v2Auto").checked, intervalMinutes: interval });
+  }
+  function wireAuto() {
+    $("v2Auto").addEventListener("change", saveAuto);
+    $("v2Interval").addEventListener("change", saveAuto);
+  }
+
   function wireUndo() {
     $("v2UndoLast").onclick = async () => {
       if (!confirm("Hoàn tác lần đồng bộ gần nhất? Nội dung file sẽ được khôi phục về trước.")) return;
@@ -364,9 +377,11 @@
     }
     renderPairs();
     renderTargets();
+    renderAuto();
     wirePairDialog();
     wireTargetDialog();
     wireCloud();
+    wireAuto();
     wireUndo();
   }
 
