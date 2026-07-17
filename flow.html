@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backup Helper — Flow</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --line:#30363d; --ink:#e6edf3; --muted:#9aa7b4;
+    --local:#58a6ff; --drive:#f0883e; --cloud:#a371f7; --ok:#3fb950; --warn:#f0883e;
+    --conflict:#f85149; --neutral:#484f58;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header h1{font-size:30px;margin:0 0 4px}
+  header p{color:var(--muted);margin:0 0 8px;font-size:15px}
+  .tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:20px;
+    background:#1f6feb22;color:var(--local);border:1px solid #1f6feb55;margin-right:6px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:26px 28px;margin-top:26px}
+  h2{font-size:20px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .num{background:#1f6feb;color:#fff;width:26px;height:26px;border-radius:8px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  .pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap}
+  .p-ok{background:#3fb95022;color:var(--ok)}
+  .p-conflict{background:#f8514922;color:var(--conflict)}
+  .p-noop{background:#484f5844;color:var(--muted)}
+  code{background:#00000044;padding:1px 6px;border-radius:5px;font-size:13px;color:#e3b341}
+  .note{border-left:3px solid var(--local);padding:4px 0 4px 14px;color:var(--muted);
+    font-size:14px;margin-top:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Backup Helper — Flow trực quan</h1>
+  <p>Sync 2 chiều tự động cho ổ cứng rời · zero-button · phát hiện &amp; ghi nhận conflict khi cắm lại</p>
+  <span class="tag">Realtime + định kỳ</span>
+  <span class="tag">3-way merge</span>
+  <span class="tag">Versioning &amp; rollback</span>
+</header>
+
+<!-- 1. TARGETS -->
+<section>
+  <h2><span class="num">1</span> Ba loại đích backup</h2>
+  <p class="sub">Cloud &amp; Local là push 1 chiều. Chỉ Work Directory (ổ cứng) chạy sync 2 chiều — nơi phát sinh conflict.</p>
+  <svg viewBox="0 0 900 300" role="img">
+    <!-- center: work source -->
+    <rect x="360" y="120" width="180" height="70" rx="12" fill="#1f6feb22" stroke="var(--local)" stroke-width="2"/>
+    <text x="450" y="150" text-anchor="middle" fill="var(--ink)" font-size="16" font-weight="700">Nguồn làm việc</text>
+    <text x="450" y="172" text-anchor="middle" fill="var(--muted)" font-size="12">(laptop mirror)</text>
+
+    <!-- cloud -->
+    <rect x="120" y="30" width="200" height="66" rx="12" fill="#a371f722" stroke="var(--cloud)" stroke-width="2"/>
+    <text x="220" y="58" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">☁ Cloud</text>
+    <text x="220" y="78" text-anchor="middle" fill="var(--muted)" font-size="11">realtime / định kỳ · 1 chiều</text>
+    <!-- arrow to cloud -->
+    <line x1="365" y1="140" x2="300" y2="90" stroke="var(--cloud)" stroke-width="2" marker-end="url(#ac)"/>
+
+    <!-- local storage -->
+    <rect x="120" y="210" width="200" height="66" rx="12" fill="#58a6ff22" stroke="var(--local)" stroke-width="2"/>
+    <text x="220" y="238" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">💾 Local storage</text>
+    <text x="220" y="258" text-anchor="middle" fill="var(--muted)" font-size="11">realtime / định kỳ · 1 chiều</text>
+    <line x1="365" y1="170" x2="300" y2="220" stroke="var(--local)" stroke-width="2" marker-end="url(#al)"/>
+
+    <!-- work dir / drive -->
+    <rect x="600" y="118" width="220" height="74" rx="12" fill="#f0883e22" stroke="var(--drive)" stroke-width="2"/>
+    <text x="710" y="146" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">🔌 Work dir = Ổ cứng rời</text>
+    <text x="710" y="167" text-anchor="middle" fill="var(--muted)" font-size="11">SYNC 2 CHIỀU · rút ra bất kỳ lúc nào</text>
+    <line x1="545" y1="145" x2="595" y2="145" stroke="var(--drive)" stroke-width="2.5" marker-end="url(#ad)"/>
+    <line x1="595" y1="165" x2="545" y2="165" stroke="var(--drive)" stroke-width="2.5" marker-end="url(#ad2)"/>
+
+    <text x="710" y="235" text-anchor="middle" fill="var(--warn)" font-size="12">⚠ Nếu Local storage trùng path với ổ → gộp làm 1, chỉ chạy sync</text>
+
+    <defs>
+      <marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--cloud)"/></marker>
+      <marker id="al" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--local)"/></marker>
+      <marker id="ad" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--drive)"/></marker>
+      <marker id="ad2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--drive)"/></marker>
+    </defs>
+  </svg>
+</section>
+
+<!-- 2. SCENARIO -->
+<section>
+  <h2><span class="num">2</span> Kịch bản: ổ đi làm ở máy khác rồi quay về</h2>
+  <p class="sub">Cả 2 phía cùng đổi khi xa nhau → khi gặp lại phải so với BASELINE (trạng thái lần sync chung gần nhất).</p>
+  <svg viewBox="0 0 900 340" role="img">
+    <!-- timeline -->
+    <line x1="60" y1="60" x2="60" y2="300" stroke="var(--line)" stroke-width="2"/>
+    <line x1="840" y1="60" x2="840" y2="300" stroke="var(--line)" stroke-width="2"/>
+    <text x="60" y="40" text-anchor="middle" fill="var(--local)" font-size="14" font-weight="700">LAPTOP</text>
+    <text x="840" y="40" text-anchor="middle" fill="var(--drive)" font-size="14" font-weight="700">Ổ CỨNG</text>
+
+    <!-- t0 baseline synced -->
+    <circle cx="60" cy="80" r="6" fill="var(--ok)"/><circle cx="840" cy="80" r="6" fill="var(--ok)"/>
+    <line x1="66" y1="80" x2="834" y2="80" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3"/>
+    <rect x="330" y="62" width="240" height="34" rx="8" fill="#3fb95022" stroke="var(--ok)"/>
+    <text x="450" y="84" text-anchor="middle" fill="var(--ok)" font-size="13" font-weight="700">✓ Sync xong → ghi BASELINE (cả 2 bên)</text>
+
+    <!-- unplug -->
+    <circle cx="840" cy="140" r="6" fill="var(--warn)"/>
+    <text x="700" y="135" text-anchor="middle" fill="var(--warn)" font-size="13" font-weight="700">🔌 rút ổ (im lặng)</text>
+    <text x="700" y="153" text-anchor="middle" fill="var(--muted)" font-size="11">không báo lỗi, không chặn</text>
+
+    <!-- divergence -->
+    <rect x="30" y="180" width="180" height="66" rx="10" fill="#58a6ff22" stroke="var(--local)"/>
+    <text x="120" y="205" text-anchor="middle" fill="var(--ink)" font-size="12" font-weight="700">Laptop vẫn sửa</text>
+    <text x="120" y="223" text-anchor="middle" fill="var(--muted)" font-size="11">A.txt, B.txt</text>
+    <text x="120" y="239" text-anchor="middle" fill="var(--muted)" font-size="11">(user làm tiếp)</text>
+
+    <rect x="690" y="180" width="180" height="66" rx="10" fill="#f0883e22" stroke="var(--drive)"/>
+    <text x="780" y="205" text-anchor="middle" fill="var(--ink)" font-size="12" font-weight="700">Ổ sửa ở máy B</text>
+    <text x="780" y="223" text-anchor="middle" fill="var(--muted)" font-size="11">B.txt, C.txt</text>
+    <text x="780" y="239" text-anchor="middle" fill="var(--muted)" font-size="11">(không có daemon)</text>
+
+    <!-- reconnect -->
+    <circle cx="840" cy="290" r="6" fill="var(--local)"/><circle cx="60" cy="290" r="6" fill="var(--local)"/>
+    <line x1="66" y1="290" x2="834" y2="290" stroke="var(--local)" stroke-width="2"/>
+    <rect x="300" y="272" width="300" height="34" rx="8" fill="#1f6feb22" stroke="var(--local)"/>
+    <text x="450" y="294" text-anchor="middle" fill="var(--local)" font-size="13" font-weight="700">🔌 cắm lại → RECONCILE (full-scan + hash)</text>
+    <text x="450" y="325" text-anchor="middle" fill="var(--muted)" font-size="12">A → chỉ laptop đổi · C → chỉ ổ đổi · <tspan fill="var(--conflict)" font-weight="700">B → CẢ HAI đổi = conflict</tspan></text>
+  </svg>
+</section>
+
+<!-- 3. STATE MACHINE -->
+<section>
+  <h2><span class="num">3</span> Máy trạng thái của daemon</h2>
+  <p class="sub">Chạy nền (launchd). User không bấm gì — chỉ hiện popup khi có conflict thật.</p>
+  <svg viewBox="0 0 900 300" role="img">
+    <!-- IDLE -->
+    <rect x="40" y="120" width="150" height="60" rx="30" fill="#161b22" stroke="var(--neutral)" stroke-width="2"/>
+    <text x="115" y="155" text-anchor="middle" fill="var(--ink)" font-size="16" font-weight="700">IDLE</text>
+
+    <!-- SYNCING -->
+    <rect x="300" y="40" width="170" height="60" rx="14" fill="#3fb95022" stroke="var(--ok)" stroke-width="2"/>
+    <text x="385" y="66" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">SYNCING</text>
+    <text x="385" y="86" text-anchor="middle" fill="var(--muted)" font-size="11">2 chiều realtime</text>
+
+    <!-- DETACHED -->
+    <rect x="300" y="210" width="170" height="60" rx="14" fill="#f0883e22" stroke="var(--warn)" stroke-width="2"/>
+    <text x="385" y="236" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">DETACHED</text>
+    <text x="385" y="256" text-anchor="middle" fill="var(--muted)" font-size="11">ổ đã rút</text>
+
+    <!-- RECONCILING -->
+    <rect x="580" y="125" width="170" height="60" rx="14" fill="#1f6feb22" stroke="var(--local)" stroke-width="2"/>
+    <text x="665" y="151" text-anchor="middle" fill="var(--ink)" font-size="15" font-weight="700">RECONCILING</text>
+    <text x="665" y="171" text-anchor="middle" fill="var(--muted)" font-size="11">3-way vs baseline</text>
+
+    <!-- CONFLICT -->
+    <rect x="580" y="30" width="280" height="48" rx="12" fill="#f8514922" stroke="var(--conflict)" stroke-width="2"/>
+    <text x="720" y="52" text-anchor="middle" fill="var(--ink)" font-size="14" font-weight="700">CONFLICT INBOX → popup hỏi user</text>
+    <text x="720" y="69" text-anchor="middle" fill="var(--muted)" font-size="11">chỉ ghi nhận, không tự sửa file</text>
+
+    <!-- edges -->
+    <path d="M190,140 Q250,90 300,80" fill="none" stroke="var(--ok)" stroke-width="2" marker-end="url(#a1)"/>
+    <text x="235" y="95" fill="var(--muted)" font-size="11">cắm + baseline khớp</text>
+
+    <path d="M300,90 Q250,180 300,230" fill="none" stroke="var(--warn)" stroke-width="2" marker-end="url(#a2)"/>
+    <text x="215" y="165" fill="var(--muted)" font-size="11">unmount</text>
+
+    <path d="M470,240 Q560,210 585,180" fill="none" stroke="var(--local)" stroke-width="2" marker-end="url(#a3)"/>
+    <text x="500" y="235" fill="var(--muted)" font-size="11">cắm lại</text>
+
+    <path d="M665,125 Q660,95 690,78" fill="none" stroke="var(--conflict)" stroke-width="2" marker-end="url(#a4)"/>
+    <text x="640" y="105" fill="var(--conflict)" font-size="11">có conflict</text>
+
+    <path d="M580,165 Q380,240 195,165" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#a5)"/>
+    <text x="380" y="200" fill="var(--muted)" font-size="11">xong (auto phần 1-phía) → ghi baseline → IDLE</text>
+
+    <defs>
+      <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--ok)"/></marker>
+      <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--warn)"/></marker>
+      <marker id="a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--local)"/></marker>
+      <marker id="a4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--conflict)"/></marker>
+      <marker id="a5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--ok)"/></marker>
+    </defs>
+  </svg>
+</section>
+
+<!-- 4. 3-WAY DECISION -->
+<section>
+  <h2><span class="num">4</span> Bảng quyết định 3-way</h2>
+  <p class="sub">So <span class="mono">local-now</span> và <span class="mono">drive-now</span> với <span class="mono">baseline</span>. Content hash là chân lý, mtime chỉ để lọc nhanh.</p>
+  <table>
+    <thead><tr><th>Local</th><th>Drive</th><th>Kết quả</th></tr></thead>
+    <tbody>
+      <tr><td>đổi</td><td>= baseline</td><td><span class="pill p-ok">push local → drive (im lặng)</span></td></tr>
+      <tr><td>= baseline</td><td>đổi</td><td><span class="pill p-ok">push drive → local (im lặng)</span></td></tr>
+      <tr><td>đổi</td><td>đổi · cùng hash</td><td><span class="pill p-noop">no-op, cập nhật baseline</span></td></tr>
+      <tr><td>đổi</td><td>đổi · khác hash</td><td><span class="pill p-conflict">CONFLICT → inbox</span></td></tr>
+      <tr><td>xóa</td><td>đổi</td><td><span class="pill p-conflict">CONFLICT → inbox</span></td></tr>
+      <tr><td>đổi</td><td>xóa</td><td><span class="pill p-conflict">CONFLICT → inbox</span></td></tr>
+      <tr><td>thêm mới</td><td>thêm mới · khác hash</td><td><span class="pill p-conflict">CONFLICT → inbox</span></td></tr>
+    </tbody>
+  </table>
+  <div class="note">Conflict chưa resolve → file giữ nguyên hiện trạng ở cả 2 phía, không bị đụng. Các file không-conflict vẫn sync bình thường, không bị chặn.</div>
+</section>
+
+<!-- 5. CONFLICT + VERSIONING -->
+<section>
+  <h2><span class="num">5</span> Resolve conflict + versioning để rollback</h2>
+  <p class="sub">Trước khi ghi đè BẤT KỲ file nào → copy bản cũ vào version store. Rollback được nguyên phiên merge.</p>
+  <div class="grid2">
+    <div>
+      <svg viewBox="0 0 420 260" role="img">
+        <rect x="20" y="20" width="380" height="220" rx="12" fill="#f8514911" stroke="var(--conflict)" stroke-width="1.5"/>
+        <text x="40" y="48" fill="var(--conflict)" font-size="14" font-weight="700">⚠ Conflict: B.txt</text>
+        <!-- option cards -->
+        <rect x="40" y="66" width="340" height="46" rx="8" fill="#161b22" stroke="var(--local)"/>
+        <text x="56" y="86" fill="var(--ink)" font-size="13" font-weight="700">keep-local</text>
+        <text x="56" y="103" fill="var(--muted)" font-size="11">giữ bản laptop, bản ổ vào versions/</text>
+
+        <rect x="40" y="120" width="340" height="46" rx="8" fill="#161b22" stroke="var(--drive)"/>
+        <text x="56" y="140" fill="var(--ink)" font-size="13" font-weight="700">keep-drive</text>
+        <text x="56" y="157" fill="var(--muted)" font-size="11">giữ bản ổ, bản laptop vào versions/</text>
+
+        <rect x="40" y="174" width="340" height="46" rx="8" fill="#161b22" stroke="var(--ok)"/>
+        <text x="56" y="194" fill="var(--ink)" font-size="13" font-weight="700">keep-both</text>
+        <text x="56" y="211" fill="var(--muted)" font-size="11">bản kia → B.conflict-drive-&lt;time&gt;.txt</text>
+      </svg>
+    </div>
+    <div>
+      <svg viewBox="0 0 420 260" role="img">
+        <text x="20" y="26" fill="var(--muted)" font-size="12" font-weight="700">.backup-helper/ (đi theo ổ + laptop)</text>
+        <g font-family="ui-monospace,Menlo,monospace" font-size="12.5">
+          <text x="24" y="56" fill="var(--local)">baseline.json</text>
+          <text x="200" y="56" fill="var(--muted)">← trạng thái sync chung</text>
+          <text x="24" y="80" fill="var(--local)">config.json</text>
+          <text x="24" y="104" fill="var(--local)">journal.log</text>
+          <text x="200" y="104" fill="var(--muted)">← resume nếu rút giữa chừng</text>
+          <text x="24" y="128" fill="var(--warn)">conflicts/</text>
+          <text x="44" y="150" fill="var(--ink)">&lt;session&gt;.json</text>
+          <text x="24" y="180" fill="var(--ok)">versions/</text>
+          <text x="44" y="202" fill="var(--ink)">&lt;session&gt;/manifest.json</text>
+          <text x="44" y="224" fill="var(--ink)">&lt;session&gt;/&lt;file gốc trước merge&gt;</text>
+        </g>
+        <rect x="20" y="236" width="380" height="1" fill="var(--line)"/>
+      </svg>
+      <div class="note"><code>backup-helper rollback &lt;session-id&gt;</code> → hoàn nguyên toàn bộ file bị ảnh hưởng bởi phiên merge đó.</div>
+    </div>
+  </div>
+</section>
+
+<!-- safety -->
+<section>
+  <h2><span class="num">6</span> Hai chốt an toàn</h2>
+  <div class="grid2">
+    <div>
+      <h2 style="font-size:15px"><span class="dot" style="background:var(--ok)"></span> Ghi atomic + journal</h2>
+      <p class="sub" style="margin:0">Viết temp → <code>rename</code>, ghi <code>journal.log</code> trước-làm-sau. Rút ổ giữa lúc sync → lần sau resume sạch, không file nửa vời.</p>
+    </div>
+    <div>
+      <h2 style="font-size:15px"><span class="dot" style="background:var(--local)"></span> Hash là chân lý</h2>
+      <p class="sub" style="margin:0">Phát hiện thay đổi bằng hash nội dung, không tin mtime (exFAT &amp; lệch giờ giữa các máy làm mtime sai).</p>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--local)"></span> Laptop / 1 chiều local</span>
+    <span><span class="dot" style="background:var(--drive)"></span> Ổ cứng / sync 2 chiều</span>
+    <span><span class="dot" style="background:var(--cloud)"></span> Cloud</span>
+    <span><span class="dot" style="background:var(--ok)"></span> Tự động / an toàn</span>
+    <span><span class="dot" style="background:var(--conflict)"></span> Conflict cần user</span>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
