@@ -19,7 +19,7 @@
       <div class="actions">
         <button id="btnToggle" class="btn">Tạm dừng</button>
         <button id="btnBackupNow" class="btn btn-primary">Sao lưu ngay</button>
-        <button id="btnAdvanced" class="btn" title="Đồng bộ 2 chiều, cloud, hoàn tác">Nâng cao ▸</button>
+        <button id="btnAdvanced" class="btn" title="Đồng bộ 2 chiều, hoàn tác, lịch sử">Nâng cao ▸</button>
       </div>
     </header>
 
@@ -105,7 +105,7 @@
         <div class="brand">
           <span class="dot on"></span>
           <div>
-            <div class="brand-title">Đồng bộ 2 chiều &amp; Cloud</div>
+            <div class="brand-title">Đồng bộ 2 chiều (Gốc ⇄ Bản làm việc)</div>
             <div class="brand-sub">Làm việc trên bản backup rồi đồng bộ ngược an toàn</div>
           </div>
         </div>
@@ -128,10 +128,10 @@
 
         <!-- Tự động -->
         <section class="card">
-          <div class="card-head"><h2>Tự động đồng bộ &amp; đẩy cloud</h2></div>
+          <div class="card-head"><h2>Tự động đồng bộ định kỳ</h2></div>
           <label class="switch-row">
             <input type="checkbox" id="v2Auto" />
-            <span>Tự động chạy định kỳ (đồng bộ 2 chiều an toàn + đẩy lên cloud). Xung đột vẫn để bạn quyết định thủ công.</span>
+            <span>Tự động chạy định kỳ (chỉ thao tác an toàn). Có xung đột thì app sẽ mở cửa sổ để bạn duyệt.</span>
           </label>
           <div class="mode-row" style="margin-top:8px">
             <label class="radio"><span>Mỗi <input type="number" id="v2Interval" min="1" value="30" class="num" /> phút</span></label>
@@ -144,31 +144,6 @@
           <div id="v2Result"></div>
         </section>
 
-        <!-- Cloud -->
-        <section class="card">
-          <div class="card-head">
-            <h2>Cloud (rclone)</h2>
-            <button id="v2RefreshCloud" class="btn btn-sm">Làm mới</button>
-          </div>
-          <div id="v2CloudStatus" class="empty">Đang kiểm tra…</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-            <button class="btn btn-sm v2Connect" data-provider="drive">＋ Kết nối Google Drive</button>
-            <button class="btn btn-sm v2Connect" data-provider="onedrive">＋ Kết nối OneDrive</button>
-          </div>
-          <p class="empty" style="text-align:left;font-size:12.5px">
-            Khi bấm kết nối, trình duyệt sẽ mở để đăng nhập &amp; cấp quyền. Đăng nhập xong quay lại đây bấm “Làm mới”.
-          </p>
-        </section>
-
-        <!-- Đích cloud -->
-        <section class="card">
-          <div class="card-head">
-            <h2>Đích cloud (nơi lưu bản sao)</h2>
-            <button id="v2AddTarget" class="btn btn-sm">+ Thêm đích</button>
-          </div>
-          <div id="v2TargetList" class="pair-list"></div>
-          <p id="v2TargetEmpty" class="empty">Chưa có đích cloud. Kết nối remote rồi thêm đích.</p>
-        </section>
       </main>
 
       <!-- Modal thêm cặp -->
@@ -193,29 +168,6 @@
         </div>
       </div>
 
-      <!-- Modal thêm đích cloud -->
-      <div id="v2TargetDlg" class="overlay hidden">
-        <div class="modal">
-          <h3>Thêm đích cloud</h3>
-          <label class="field"><span>Tên gợi nhớ</span>
-            <div class="pick"><input id="v2tName" type="text" placeholder="VD: Google Drive công ty" /></div>
-          </label>
-          <label class="field"><span>Remote (rclone)</span>
-            <div class="pick"><select id="v2tRemote" class="num" style="width:100%"></select></div>
-          </label>
-          <label class="field"><span>Thư mục trên cloud</span>
-            <div class="pick"><input id="v2tDest" type="text" placeholder="VD: backup/du-an-A" /></div>
-          </label>
-          <label class="switch-row">
-            <input type="checkbox" id="v2tMirror" />
-            <span>Mirror (xoá trên cloud khi bản làm việc xoá)<br /><small>Bỏ chọn = chỉ thêm/cập nhật (an toàn)</small></span>
-          </label>
-          <div class="modal-actions">
-            <button id="v2tCancel" class="btn">Hủy</button>
-            <button id="v2tSave" class="btn btn-primary">Thêm</button>
-          </div>
-        </div>
-      </div>
     </div><!-- /tab-v2 -->
 
     <script src="main.js"></script>
