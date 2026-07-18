@@ -66,6 +66,31 @@ fn now_id() -> String {
     format!("p{}", chrono::Local::now().timestamp_micros())
 }
 
+/// Thư mục còn "sống" không (USB còn cắm, ổ mạng còn nối)?
+/// Dùng read_dir thay vì exists(): bắt được cả trường hợp mount point còn
+/// nhưng không đọc được.
+pub fn dir_accessible(p: &Path) -> bool {
+    std::fs::read_dir(p).is_ok()
+}
+
+/// Chốt an toàn: scan_dir trả index RỖNG với thư mục không tồn tại — nếu không
+/// chặn ở đây, rút USB sẽ bị hiểu là "xóa toàn bộ file" và lan sang phía kia.
+fn ensure_pair_accessible(p: &V2Pair) -> Result<(), String> {
+    if !dir_accessible(Path::new(&p.origin)) {
+        return Err(format!(
+            "Thư mục gốc không truy cập được: {} — bỏ qua để tránh xóa nhầm",
+            p.origin
+        ));
+    }
+    if !dir_accessible(Path::new(&p.working)) {
+        return Err(format!(
+            "Bản làm việc không truy cập được: {} — bỏ qua để tránh xóa nhầm",
+            p.working
+        ));
+    }
+    Ok(())
+}
+
 impl SyncManager {
     pub fn new(engine: Engine, cfg_path: PathBuf) -> SyncManager {
         let cfg = std::fs::read_to_string(&cfg_path)
@@ -92,6 +117,7 @@ impl SyncManager {
 
     fn plan(&self, id: &str) -> R<Plan> {
         let p = self.find_pair(id)?;
+        ensure_pair_accessible(&p)?;
         self.engine
             .plan(&p.id, Path::new(&p.origin), Path::new(&p.working))
             .map_err(|e| e.to_string())
@@ -99,6 +125,7 @@ impl SyncManager {
 
     fn apply(&mut self, id: &str) -> R<ApplyReport> {
         let p = self.find_pair(id)?;
+        ensure_pair_accessible(&p)?;
         let plan = self
             .engine
             .plan(&p.id, Path::new(&p.origin), Path::new(&p.working))
@@ -131,6 +158,7 @@ impl SyncManager {
     /// Giải quyết 1 xung đột theo lựa chọn của người dùng.
     fn resolve(&mut self, id: &str, rel: &str, keep: Side) -> R<String> {
         let p = self.find_pair(id)?;
+        ensure_pair_accessible(&p)?;
         let origin = Path::new(&p.origin);
         let working = Path::new(&p.working);
         let origin_has = origin.join(rel).exists();
@@ -312,4 +340,32 @@ pub fn init(app: &AppHandle) -> SyncManager {
     let engine = Engine::open(&v2dir.join("meta.db"), &v2dir.join("store"))
         .expect("không mở được engine v2");
     SyncManager::new(engine, v2dir.join("v2-config.json"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dir_accessible_phan_biet_ton_tai_va_khong() {
+        let ok = std::env::temp_dir();
+        assert!(dir_accessible(&ok));
+        assert!(!dir_accessible(Path::new("/khong/ton/tai/chac/chan")));
+    }
+
+    #[test]
+    fn ensure_pair_accessible_chan_khi_mot_phia_mat() {
+        let tmp = std::env::temp_dir();
+        let p = V2Pair {
+            id: "t".into(),
+            name: "t".into(),
+            origin: tmp.to_string_lossy().to_string(),
+            working: "/khong/ton/tai/usb-rut-ra".into(),
+        };
+        let err = ensure_pair_accessible(&p).unwrap_err();
+        assert!(err.contains("không truy cập được"), "phải nêu rõ lý do: {}", err);
+
+        let ok_pair = V2Pair { working: p.origin.clone(), ..p };
+        assert!(ensure_pair_accessible(&ok_pair).is_ok());
+    }
 }
