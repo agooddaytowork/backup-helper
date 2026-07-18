@@ -144,6 +144,20 @@
           <div id="v2Result"></div>
         </section>
 
+        <!-- Lịch sử phiên bản -->
+        <section class="card">
+          <div class="card-head"><h2>Lịch sử phiên bản (khôi phục về quá khứ)</h2></div>
+          <div class="pick" style="gap:8px">
+            <select id="v2hPair" class="num" style="min-width:160px"></select>
+            <input id="v2hRel" type="text" placeholder="Đường dẫn tương đối, VD: baocao/thang7.xlsx" />
+            <button id="v2hShow" class="btn btn-sm">Xem lịch sử</button>
+          </div>
+          <div id="v2History"></div>
+          <p class="empty" style="text-align:left;font-size:12.5px">
+            Mọi file bị ghi đè/xóa khi đồng bộ đều được giữ lại tự động — chọn phiên bản để khôi phục ra thư mục bạn muốn.
+          </p>
+        </section>
+
       </main>
 
       <!-- Modal thêm cặp -->

@@ -85,6 +85,7 @@
       };
       list.appendChild(row);
     }
+    renderHistoryPairs(); // select lịch sử luôn khớp danh sách cặp
   }
 
   // ---------- Plan / Apply / Resolve ----------
@@ -272,6 +273,63 @@
     $("v2Interval").addEventListener("change", saveAuto);
   }
 
+  // ---------- Lịch sử phiên bản (time travel) ----------
+  function renderHistoryPairs() {
+    const sel = $("v2hPair");
+    sel.innerHTML = cfg.pairs.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
+  }
+
+  function fmtTime(micros) {
+    return new Date(micros / 1000).toLocaleString("vi-VN");
+  }
+  function fmtSize(b) {
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+    if (b >= 1024) return (b / 1024).toFixed(1) + " KB";
+    return b + " B";
+  }
+
+  function wireHistory() {
+    $("v2hShow").onclick = async () => {
+      const pairId = $("v2hPair").value;
+      const rel = $("v2hRel").value.trim();
+      const box = $("v2History");
+      if (!pairId || !rel) return alert("Chọn cặp và nhập đường dẫn tương đối của file.");
+      box.innerHTML = "<p class='empty'>Đang tải…</p>";
+      try {
+        const list = await invoke("v2_history", { id: pairId, rel });
+        if (!list.length) {
+          box.innerHTML = "<p class='empty' style='text-align:left'>Chưa có phiên bản nào được lưu cho file này.</p>";
+          return;
+        }
+        box.innerHTML = "";
+        for (const v of list) {
+          const row = document.createElement("div");
+          row.className = "v2-line";
+          row.innerHTML = `<span class="v2-badge ${v.op === "delete" ? "v2-del" : "v2-copy"}">${
+            v.op === "delete" ? "Trước khi xóa" : "Trước khi ghi đè"
+          }</span>
+            <span>${fmtTime(v.created_at)} · ${fmtSize(v.size)}</span>
+            <button class="btn btn-sm" style="margin-left:auto">Khôi phục…</button>`;
+          row.querySelector("button").onclick = async () => {
+            const folder = await invoke("pick_folder");
+            if (!folder) return;
+            const base = rel.split("/").pop();
+            const dst = folder + "/" + "khoi-phuc-" + base;
+            try {
+              await invoke("v2_restore_version", { versionId: v.id, dst });
+              alert("Đã khôi phục ra: " + dst);
+            } catch (e) {
+              alert("Không khôi phục được: " + e);
+            }
+          };
+          box.appendChild(row);
+        }
+      } catch (e) {
+        box.innerHTML = `<p class="empty" style="color:var(--red)">Lỗi: ${esc(e)}</p>`;
+      }
+    };
+  }
+
   function wireUndo() {
     $("v2UndoLast").onclick = async () => {
       if (!confirm("Hoàn tác lần đồng bộ gần nhất? Nội dung file sẽ được khôi phục về trước.")) return;
@@ -297,6 +355,7 @@
     wireAuto();
     wireUndo();
     wireEvents();
+    wireHistory();
     loadConn();
   }
 
