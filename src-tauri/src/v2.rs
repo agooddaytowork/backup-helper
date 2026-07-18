@@ -1,8 +1,6 @@
-//! Lớp wiring v2: nối engine đồng bộ 2 chiều + replication rclone vào Tauri.
-//! Quản lý cấu hình (cặp origin↔working + cloud target), điều phối
-//! plan/apply/resolve/undo/history và fan-out cloud.
+//! Lớp wiring v2: nối engine đồng bộ 2 chiều vào Tauri.
+//! Quản lý cấu hình cặp origin↔working, điều phối plan/apply/resolve/undo/history.
 
-use crate::sync::cloud::{replicate_all, CloudTarget, Rclone};
 use crate::sync::types::{Conflict, Direction, OpKind, Plan, PlannedOp, Side};
 use crate::sync::Engine;
 use serde::{Deserialize, Serialize};
@@ -23,8 +21,6 @@ pub struct V2Config {
     #[serde(default)]
     pub pairs: Vec<V2Pair>,
     #[serde(default)]
-    pub targets: Vec<CloudTarget>,
-    #[serde(default)]
     pub last_run: Option<String>,
     /// Tự động đồng bộ + đẩy cloud định kỳ.
     #[serde(default)]
@@ -41,7 +37,6 @@ impl Default for V2Config {
     fn default() -> Self {
         V2Config {
             pairs: vec![],
-            targets: vec![],
             last_run: None,
             auto: false,
             interval_minutes: 30,
@@ -53,25 +48,9 @@ pub struct SyncManager {
     engine: Engine,
     cfg: V2Config,
     cfg_path: PathBuf,
-    rclone: Option<Rclone>,
 }
 
 // ---------- DTO trả về UI ----------
-
-#[derive(Serialize)]
-pub struct V2Status {
-    pub rclone_installed: bool,
-    pub rclone_version: String,
-    pub remotes: Vec<String>,
-}
-
-#[derive(Serialize)]
-pub struct ReplStatus {
-    pub target_id: String,
-    pub target_name: String,
-    pub ok: bool,
-    pub message: String,
-}
 
 #[derive(Serialize)]
 pub struct ApplyReport {
@@ -79,7 +58,6 @@ pub struct ApplyReport {
     pub copied: usize,
     pub deleted: usize,
     pub conflicts: Vec<Conflict>,
-    pub replication: Vec<ReplStatus>,
 }
 
 type R<T> = Result<T, String>;
@@ -89,21 +67,12 @@ fn now_id() -> String {
 }
 
 impl SyncManager {
-    pub fn new(engine: Engine, cfg_path: PathBuf, rclone_cfg: PathBuf) -> SyncManager {
+    pub fn new(engine: Engine, cfg_path: PathBuf) -> SyncManager {
         let cfg = std::fs::read_to_string(&cfg_path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
-        let rclone = Rclone::locate().map(|mut rc| {
-            rc.set_config(rclone_cfg);
-            rc
-        });
-        SyncManager {
-            engine,
-            cfg,
-            cfg_path,
-            rclone,
-        }
+        SyncManager { engine, cfg, cfg_path }
     }
 
     fn save(&self) {
@@ -151,47 +120,12 @@ impl SyncManager {
         self.cfg.last_run = Some(run_id.clone());
         self.save();
 
-        let replication = self.replicate(&p);
         Ok(ApplyReport {
             run_id,
             copied,
             deleted,
             conflicts: plan.conflicts,
-            replication,
         })
-    }
-
-    /// Fan-out bản working (SOT) lên mọi cloud target đang bật.
-    fn replicate(&self, pair: &V2Pair) -> Vec<ReplStatus> {
-        let rc = match &self.rclone {
-            Some(rc) => rc,
-            None => return vec![],
-        };
-        let enabled: Vec<CloudTarget> = self.cfg.targets.iter().filter(|t| t.enabled).cloned().collect();
-        if enabled.is_empty() {
-            return vec![];
-        }
-        replicate_all(rc, Path::new(&pair.working), &enabled)
-            .into_iter()
-            .map(|r| match r.outcome {
-                Ok(o) => ReplStatus {
-                    target_id: r.target_id,
-                    target_name: r.target_name,
-                    ok: o.success,
-                    message: if o.success {
-                        "Đã đồng bộ lên cloud".into()
-                    } else {
-                        o.output
-                    },
-                },
-                Err(e) => ReplStatus {
-                    target_id: r.target_id,
-                    target_name: r.target_name,
-                    ok: false,
-                    message: e,
-                },
-            })
-            .collect()
     }
 
     /// Giải quyết 1 xung đột theo lựa chọn của người dùng.
@@ -239,23 +173,6 @@ type St<'a> = State<'a, Mutex<SyncManager>>;
 #[tauri::command]
 pub fn v2_get_config(state: St) -> V2Config {
     state.lock().unwrap().cfg.clone()
-}
-
-#[tauri::command]
-pub fn v2_status(state: St) -> V2Status {
-    let m = state.lock().unwrap();
-    match &m.rclone {
-        Some(rc) => V2Status {
-            rclone_installed: true,
-            rclone_version: rc.version().unwrap_or_default(),
-            remotes: rc.list_remotes().unwrap_or_default(),
-        },
-        None => V2Status {
-            rclone_installed: false,
-            rclone_version: String::new(),
-            remotes: vec![],
-        },
-    }
 }
 
 #[tauri::command]
@@ -349,64 +266,6 @@ pub fn v2_restore_version(state: St, version_id: i64, dst: String) -> R<()> {
         .map_err(|e| e.to_string())
 }
 
-// ---------- cloud target ----------
-
-#[tauri::command]
-pub fn v2_add_target(
-    state: St,
-    name: String,
-    remote: String,
-    dest_path: String,
-    mirror: bool,
-) -> V2Config {
-    let mut m = state.lock().unwrap();
-    m.cfg.targets.push(CloudTarget {
-        id: now_id(),
-        name,
-        remote,
-        dest_path,
-        mirror,
-        enabled: true,
-    });
-    m.save();
-    m.cfg.clone()
-}
-
-#[tauri::command]
-pub fn v2_remove_target(state: St, id: String) -> V2Config {
-    let mut m = state.lock().unwrap();
-    m.cfg.targets.retain(|t| t.id != id);
-    m.save();
-    m.cfg.clone()
-}
-
-#[tauri::command]
-pub fn v2_replicate(state: St, id: String) -> R<Vec<ReplStatus>> {
-    let m = state.lock().unwrap();
-    let p = m.find_pair(&id)?;
-    Ok(m.replicate(&p))
-}
-
-/// Kết nối 1 remote cloud mới (OAuth qua trình duyệt). BLOCK tới khi xong.
-#[tauri::command]
-pub async fn v2_connect_remote(state: St<'_>, name: String, provider: String) -> R<String> {
-    let rclone = {
-        let m = state.lock().unwrap();
-        m.rclone.clone()
-    };
-    let rclone = rclone.ok_or("rclone chưa sẵn sàng trên máy")?;
-    let name2 = name.clone();
-    let res = tauri::async_runtime::spawn_blocking(move || rclone.config_create(&name2, &provider))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
-    if res.success {
-        Ok(format!("Đã kết nối cloud: {}", name))
-    } else {
-        Err(res.output)
-    }
-}
-
 #[tauri::command]
 pub fn v2_set_auto(state: St, auto: bool, interval_minutes: u64) -> V2Config {
     let mut m = state.lock().unwrap();
@@ -416,7 +275,7 @@ pub fn v2_set_auto(state: St, auto: bool, interval_minutes: u64) -> V2Config {
     m.cfg.clone()
 }
 
-/// Luồng nền: định kỳ chạy đồng bộ + đẩy cloud cho mọi cặp (nếu bật tự động).
+/// Luồng nền: định kỳ chạy đồng bộ cho mọi cặp (nếu bật tự động).
 /// Xung đột KHÔNG tự xử lý — vẫn để người dùng quyết định.
 pub fn start_scheduler(app: AppHandle) {
     std::thread::spawn(move || loop {
@@ -440,7 +299,7 @@ pub fn start_scheduler(app: AppHandle) {
         }
         for id in ids {
             let mut m = st.lock().unwrap();
-            let _ = m.apply(&id); // apply đã gồm cả local + fan-out cloud
+            let _ = m.apply(&id); // apply chỉ chạy thao tác an toàn; conflict để người dùng quyết
         }
     });
 }
@@ -452,5 +311,5 @@ pub fn init(app: &AppHandle) -> SyncManager {
     let _ = std::fs::create_dir_all(&v2dir);
     let engine = Engine::open(&v2dir.join("meta.db"), &v2dir.join("store"))
         .expect("không mở được engine v2");
-    SyncManager::new(engine, v2dir.join("v2-config.json"), v2dir.join("rclone.conf"))
+    SyncManager::new(engine, v2dir.join("v2-config.json"))
 }

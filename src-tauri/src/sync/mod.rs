@@ -1,5 +1,5 @@
-//! Engine đồng bộ 2 chiều v2 (Phase 1): metadata DB + phát hiện thay đổi +
-//! diff 3 phía + version store để rollback. CHƯA gồm cloud (Phase 2).
+//! Engine đồng bộ 2 chiều v2: metadata DB + phát hiện thay đổi +
+//! diff 3 phía + version store để rollback.
 //!
 //! Bất biến an toàn: mọi file bị ghi đè/xóa đều được cất vào version store
 //! TRƯỚC khi thay đổi; mọi thao tác được ghi journal để undo.
@@ -8,7 +8,6 @@
 // Phase tiếp theo — cho phép chưa dùng tới trong lúc build backend.
 #![allow(dead_code)]
 
-pub mod cloud;
 pub mod db;
 pub mod diff;
 pub mod scan;

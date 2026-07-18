@@ -294,7 +294,7 @@ pub fn run() {
                 engine: Mutex::new(Some(eng)),
             });
 
-            // State v2: engine đồng bộ 2 chiều + replication cloud.
+            // State v2: engine đồng bộ 2 chiều.
             app.manage(Mutex::new(v2::init(&handle)));
             v2::start_scheduler(handle.clone());
 
@@ -332,7 +332,6 @@ pub fn run() {
             backup_now,
             show_window,
             v2::v2_get_config,
-            v2::v2_status,
             v2::v2_add_pair,
             v2::v2_remove_pair,
             v2::v2_plan,
@@ -342,10 +341,6 @@ pub fn run() {
             v2::v2_undo_last,
             v2::v2_history,
             v2::v2_restore_version,
-            v2::v2_add_target,
-            v2::v2_remove_target,
-            v2::v2_replicate,
-            v2::v2_connect_remote,
             v2::v2_set_auto
         ])
         .run(tauri::generate_context!())
