@@ -4,9 +4,10 @@
 use crate::sync::types::{Conflict, Direction, OpKind, Plan, PlannedOp, Side};
 use crate::sync::Engine;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct V2Pair {
@@ -48,6 +49,8 @@ pub struct SyncManager {
     engine: Engine,
     cfg: V2Config,
     cfg_path: PathBuf,
+    /// Trạng thái kết nối per-pair do watcher cập nhật (id -> connected).
+    conn: HashMap<String, bool>,
 }
 
 // ---------- DTO trả về UI ----------
@@ -97,7 +100,7 @@ impl SyncManager {
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
-        SyncManager { engine, cfg, cfg_path }
+        SyncManager { engine, cfg, cfg_path, conn: HashMap::new() }
     }
 
     fn save(&self) {
@@ -303,6 +306,107 @@ pub fn v2_set_auto(state: St, auto: bool, interval_minutes: u64) -> V2Config {
     m.cfg.clone()
 }
 
+// ================= Watcher kết nối =================
+
+/// Sự kiện chuyển trạng thái kết nối của một cặp.
+#[derive(Debug, PartialEq)]
+pub enum ConnEvent {
+    Disconnected,
+    Reconnected,
+}
+
+/// prev=None là lần quan sát đầu tiên sau khi app mở — không bắn event
+/// (tránh hiện thẻ duyệt oan mỗi lần khởi động).
+pub fn conn_transition(prev: Option<bool>, connected: bool) -> Option<ConnEvent> {
+    match (prev, connected) {
+        (Some(true), false) => Some(ConnEvent::Disconnected),
+        (Some(false), true) => Some(ConnEvent::Reconnected),
+        _ => None,
+    }
+}
+
+#[derive(Serialize, Clone)]
+pub struct ConnPayload {
+    pub pair_id: String,
+    pub connected: bool,
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Watcher: poll 5s, chỉ read_dir thư mục gốc 2 phía. KHÔNG giữ lock
+/// SyncManager trong lúc read_dir (ổ mạng chết có thể block rất lâu).
+pub fn start_conn_watcher(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut prev: HashMap<String, bool> = HashMap::new();
+        loop {
+            let pairs = {
+                let st = app.state::<Mutex<SyncManager>>();
+                let m = st.lock().unwrap();
+                m.cfg.pairs.clone()
+            };
+            for p in &pairs {
+                let connected = dir_accessible(Path::new(&p.origin))
+                    && dir_accessible(Path::new(&p.working));
+                let ev = conn_transition(prev.get(&p.id).copied(), connected);
+                prev.insert(p.id.clone(), connected);
+                {
+                    let st = app.state::<Mutex<SyncManager>>();
+                    st.lock().unwrap().conn.insert(p.id.clone(), connected);
+                }
+                match ev {
+                    Some(ConnEvent::Disconnected) => {
+                        let _ = app.emit(
+                            "v2-conn-changed",
+                            ConnPayload { pair_id: p.id.clone(), connected: false },
+                        );
+                    }
+                    Some(ConnEvent::Reconnected) => {
+                        let _ = app.emit(
+                            "v2-conn-changed",
+                            ConnPayload { pair_id: p.id.clone(), connected: true },
+                        );
+                        // Reconnect KHÔNG tự sync: chỉ báo UI hiện thẻ duyệt.
+                        let _ = app.emit(
+                            "v2-reconnected",
+                            ConnPayload { pair_id: p.id.clone(), connected: true },
+                        );
+                        show_main_window(&app);
+                    }
+                    None => {}
+                }
+            }
+            prev.retain(|id, _| pairs.iter().any(|p| &p.id == id));
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
+    });
+}
+
+#[derive(Serialize)]
+pub struct ConnStatus {
+    pub pair_id: String,
+    pub connected: bool,
+}
+
+#[tauri::command]
+pub fn v2_conn_status(state: St) -> Vec<ConnStatus> {
+    let m = state.lock().unwrap();
+    m.cfg
+        .pairs
+        .iter()
+        .map(|p| ConnStatus {
+            pair_id: p.id.clone(),
+            // Chưa quan sát lần nào -> coi như đang kết nối (watcher sẽ sửa sau ≤5s).
+            connected: m.conn.get(&p.id).copied().unwrap_or(true),
+        })
+        .collect()
+}
+
 /// Luồng nền: định kỳ chạy đồng bộ cho mọi cặp (nếu bật tự động).
 /// Xung đột KHÔNG tự xử lý — vẫn để người dùng quyết định.
 pub fn start_scheduler(app: AppHandle) {
@@ -367,5 +471,18 @@ mod tests {
 
         let ok_pair = V2Pair { working: p.origin.clone(), ..p };
         assert!(ensure_pair_accessible(&ok_pair).is_ok());
+    }
+
+    #[test]
+    fn conn_transition_chi_ban_event_khi_doi_trang_thai() {
+        // Lần quan sát đầu (prev=None): không bắn gì, kể cả đang mất kết nối.
+        assert_eq!(conn_transition(None, true), None);
+        assert_eq!(conn_transition(None, false), None);
+        // Giữ nguyên trạng thái: không bắn.
+        assert_eq!(conn_transition(Some(true), true), None);
+        assert_eq!(conn_transition(Some(false), false), None);
+        // Chuyển trạng thái: bắn đúng event.
+        assert_eq!(conn_transition(Some(true), false), Some(ConnEvent::Disconnected));
+        assert_eq!(conn_transition(Some(false), true), Some(ConnEvent::Reconnected));
     }
 }

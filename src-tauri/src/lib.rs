@@ -297,6 +297,7 @@ pub fn run() {
             // State v2: engine đồng bộ 2 chiều.
             app.manage(Mutex::new(v2::init(&handle)));
             v2::start_scheduler(handle.clone());
+            v2::start_conn_watcher(handle.clone());
 
             build_tray(app)?;
 
@@ -341,7 +342,8 @@ pub fn run() {
             v2::v2_undo_last,
             v2::v2_history,
             v2::v2_restore_version,
-            v2::v2_set_auto
+            v2::v2_set_auto,
+            v2::v2_conn_status
         ])
         .run(tauri::generate_context!())
         .expect("lỗi khi chạy ứng dụng Backup Helper");
