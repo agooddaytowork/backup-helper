@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backup Helper — Workflow v0.3.0 (Reconnect + Duyệt sync, bỏ cloud)</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a30;
+    --panel2: #0f1730;
+    --ink: #e6ecff;
+    --muted: #93a1c4;
+    --line: #23304f;
+    --accent: #4f8cff;
+    --accent2: #22d3a6;
+    --warn: #f5a524;
+    --danger: #ff5d6c;
+    --ok: #2dd4a7;
+    --chip: #1b2544;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, #0b1020, #0a0f1e 40%);
+    color: var(--ink);
+    font: 15px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 40px 28px 120px; }
+  .tag { display: inline-block; background: var(--chip); color: var(--accent); border: 1px solid var(--line);
+         padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  h1.title { font-size: 30px; margin: 14px 0 6px; line-height: 1.2; }
+  .byline { color: var(--muted); font-size: 14px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 30px; }
+  h2 { font-size: 22px; margin: 46px 0 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+  h2 .n { color: var(--accent); font-weight: 700; margin-right: 8px; }
+  p { color: #d4ddf5; }
+  .lead { font-size: 16px; color: #c7d2ee; }
+  code { background: #0c1430; border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px; font-size: 13px; color: #8fd6ff; }
+  ul { padding-left: 20px; }
+  li { margin: 5px 0; }
+  strong { color: #fff; }
+  .callout { border-left: 3px solid var(--accent); background: #0e1730; padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--danger); }
+  .callout.ok { border-color: var(--ok); }
+  .callout b { color: #fff; }
+  figure { margin: 20px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  figcaption { color: var(--muted); font-size: 12.5px; margin-top: 10px; text-align: center; }
+  svg { width: 100%; height: auto; display: block; }
+
+  /* SVG classes */
+  .sv-box   { fill: #16203c; stroke: #35476f; stroke-width: 1.2; rx: 10; }
+  .sv-box2  { fill: #0e1730; stroke: #23304f; stroke-width: 1.2; }
+  .sv-ok    { fill: #0c2019; stroke: #1c4d40; stroke-width: 1.2; }
+  .sv-warn  { fill: #20180c; stroke: #4d3a15; stroke-width: 1.2; }
+  .sv-bad   { fill: #250f14; stroke: #5a2430; stroke-width: 1.2; }
+  .sv-t     { fill: #e6ecff; font: 600 13.5px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-ts    { fill: #93a1c4; font: 12px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-tl    { fill: #93a1c4; font: 11.5px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-tacc  { fill: #4f8cff; font: 700 12px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-tok   { fill: #2dd4a7; font: 700 12.5px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-twarn { fill: #f5a524; font: 700 12.5px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-tbad  { fill: #ff5d6c; font: 700 12.5px -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .sv-line  { stroke: #5b6b93; stroke-width: 1.6; fill: none; }
+  .sv-line2 { stroke: #35476f; stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; }
+  .sv-lok   { stroke: #2dd4a7; stroke-width: 1.8; fill: none; }
+  .sv-lbad  { stroke: #ff5d6c; stroke-width: 1.8; fill: none; }
+  .sv-lwarn { stroke: #f5a524; stroke-width: 1.8; fill: none; }
+  .sv-lane  { stroke: #23304f; stroke-width: 1; stroke-dasharray: 3 5; }
+  .sv-x     { stroke: #ff5d6c; stroke-width: 5; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <span class="tag">Thiết kế v0.3.0 · 2026-07-18</span>
+  <h1 class="title">Workflow mới: phát hiện reconnect + duyệt trước khi sync</h1>
+  <p class="byline">Giữ nguyên backup 1 chiều (v1) · Sync 2 chiều origin ↔ working có bước duyệt · Bỏ cloud (rclone) · Luôn giữ bản cũ để time-travel</p>
+</header>
+
+<h2><span class="n">1</span>Bức tranh tổng thể</h2>
+<p class="lead">Một thư mục <strong>Bản gốc (origin)</strong>, hai dòng chảy: backup 1 chiều như cũ, và bản làm việc 2 chiều trên USB/ổ mạng. Cloud bị gỡ hẳn.</p>
+
+<figure>
+<svg viewBox="0 0 940 330" role="img" aria-label="Tổng quan workflow">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b93"/>
+    </marker>
+    <marker id="arok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2dd4a7"/>
+    </marker>
+  </defs>
+
+  <!-- Origin -->
+  <rect class="sv-box" x="40" y="120" width="200" height="80" rx="10"/>
+  <text class="sv-t" x="140" y="155" text-anchor="middle">Bản gốc (origin)</text>
+  <text class="sv-ts" x="140" y="176" text-anchor="middle">máy của bạn</text>
+
+  <!-- Backup (v1) -->
+  <rect class="sv-box" x="640" y="30" width="220" height="72" rx="10"/>
+  <text class="sv-t" x="750" y="60" text-anchor="middle">Backup</text>
+  <text class="sv-ts" x="750" y="81" text-anchor="middle">v1 — giữ nguyên, không đổi</text>
+  <path class="sv-line" d="M240,140 C 420,110 480,80 632,68" marker-end="url(#ar)"/>
+  <text class="sv-tl" x="430" y="86" text-anchor="middle">1 chiều · realtime / định kỳ</text>
+
+  <!-- Working (v2) -->
+  <rect class="sv-ok" x="640" y="130" width="220" height="80" rx="10"/>
+  <text class="sv-t" x="750" y="160" text-anchor="middle">Bản làm việc (working)</text>
+  <text class="sv-ts" x="750" y="181" text-anchor="middle">USB / ổ mạng — có thể rút ra</text>
+  <path class="sv-lok" d="M248,155 L 632,155" marker-end="url(#arok)"/>
+  <path class="sv-lok" d="M632,182 L 248,182" marker-end="url(#arok)"/>
+  <text class="sv-tok" x="440" y="147" text-anchor="middle">v2 — sync 2 chiều</text>
+  <text class="sv-tl" x="440" y="203" text-anchor="middle">reconnect phải DUYỆT · định kỳ tự chạy phần an toàn</text>
+
+  <!-- Version store -->
+  <rect class="sv-box2" x="340" y="248" width="260" height="58" rx="10"/>
+  <text class="sv-t" x="470" y="272" text-anchor="middle">Version store + journal</text>
+  <text class="sv-ts" x="470" y="291" text-anchor="middle">mọi bản bị ghi đè/xóa đều được cất trước</text>
+  <path class="sv-line2" d="M200,200 C 260,235 300,250 332,262"/>
+  <path class="sv-line2" d="M700,210 C 660,240 640,252 608,262"/>
+
+  <!-- Cloud removed -->
+  <rect class="sv-bad" x="40" y="30" width="200" height="60" rx="10"/>
+  <text class="sv-t" x="140" y="55" text-anchor="middle">Cloud (rclone)</text>
+  <text class="sv-tbad" x="140" y="76" text-anchor="middle">ĐÃ GỠ khỏi v0.3.0</text>
+  <path class="sv-x" d="M52,38 L96,82"/>
+  <path class="sv-x" d="M96,38 L52,82"/>
+</svg>
+<figcaption>Hình 1 — Tổng quan: v1 giữ nguyên; v2 hai chiều qua bước duyệt; cloud bị loại bỏ.</figcaption>
+</figure>
+
+<h2><span class="n">2</span>Watcher kết nối — poll rẻ, chỉ sờ thư mục gốc</h2>
+<p>Thread nền mỗi <strong>5 giây</strong> gọi <code>read_dir</code> trên <strong>thư mục gốc</strong> của origin và working (1 syscall, không đi vào cây thư mục). Việc quét thay đổi file chỉ chạy khi thật sự cần sync.</p>
+
+<figure>
+<svg viewBox="0 0 940 270" role="img" aria-label="Máy trạng thái kết nối">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b93"/>
+    </marker>
+  </defs>
+
+  <rect class="sv-box2" x="330" y="20" width="280" height="44" rx="22"/>
+  <text class="sv-t" x="470" y="47" text-anchor="middle">Watcher: poll mỗi 5 giây</text>
+  <text class="sv-tl" x="470" y="82" text-anchor="middle">connected = read_dir(origin) OK &amp;&amp; read_dir(working) OK</text>
+
+  <!-- states -->
+  <rect class="sv-ok" x="90" y="120" width="250" height="76" rx="14"/>
+  <text class="sv-tok" x="215" y="152" text-anchor="middle">ĐANG KẾT NỐI</text>
+  <text class="sv-ts" x="215" y="174" text-anchor="middle">plan / apply / định kỳ hoạt động</text>
+
+  <rect class="sv-bad" x="600" y="120" width="250" height="76" rx="14"/>
+  <text class="sv-tbad" x="725" y="152" text-anchor="middle">MẤT KẾT NỐI</text>
+  <text class="sv-ts" x="725" y="174" text-anchor="middle">mọi sync bị CHẶN (chốt an toàn)</text>
+
+  <!-- transitions -->
+  <path class="sv-lbad" d="M340,140 C 440,110 520,110 592,138" marker-end="url(#ar2)"/>
+  <text class="sv-tl" x="470" y="112" text-anchor="middle">read_dir lỗi → event v2-conn-changed (badge đỏ trên UI)</text>
+
+  <path class="sv-lok" d="M600,180 C 500,212 420,212 348,182" marker-end="url(#ar2)"/>
+  <text class="sv-tl" x="474" y="228" text-anchor="middle">read_dir OK trở lại → event v2-reconnected + mở cửa sổ → THẺ DUYỆT</text>
+
+  <text class="sv-tl" x="474" y="256" text-anchor="middle">Lưu ý: lúc app mới mở, trạng thái đầu tiên KHÔNG bắn reconnect (tránh duyệt oan mỗi lần khởi động).</text>
+</svg>
+<figcaption>Hình 2 — Máy trạng thái per-pair. Chỉ cú chuyển "mất → có lại" mới kích hoạt luồng duyệt.</figcaption>
+</figure>
+
+<h2><span class="n">3</span>Luồng reconnect: luôn duyệt trước khi sync</h2>
+<p>Khi ổ working cắm lại / ổ mạng nối lại: app <strong>không tự sync</strong>. Nó tính plan, bật cửa sổ và chờ bạn duyệt.</p>
+
+<figure>
+<svg viewBox="0 0 940 430" role="img" aria-label="Luồng duyệt khi reconnect">
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b93"/>
+    </marker>
+    <marker id="ar3ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2dd4a7"/>
+    </marker>
+  </defs>
+
+  <!-- lane headers -->
+  <rect class="sv-box2" x="30"  y="20" width="180" height="40" rx="8"/><text class="sv-t" x="120" y="45" text-anchor="middle">Watcher</text>
+  <rect class="sv-box2" x="270" y="20" width="180" height="40" rx="8"/><text class="sv-t" x="360" y="45" text-anchor="middle">UI — thẻ duyệt</text>
+  <rect class="sv-box2" x="510" y="20" width="180" height="40" rx="8"/><text class="sv-t" x="600" y="45" text-anchor="middle">Engine v2</text>
+  <rect class="sv-box2" x="740" y="20" width="180" height="40" rx="8"/><text class="sv-t" x="830" y="45" text-anchor="middle">Version store</text>
+  <line class="sv-lane" x1="120" y1="60" x2="120" y2="410"/>
+  <line class="sv-lane" x1="360" y1="60" x2="360" y2="410"/>
+  <line class="sv-lane" x1="600" y1="60" x2="600" y2="410"/>
+  <line class="sv-lane" x1="830" y1="60" x2="830" y2="410"/>
+
+  <!-- steps -->
+  <path class="sv-line" d="M120,90 L352,90" marker-end="url(#ar3)"/>
+  <text class="sv-tl" x="236" y="82" text-anchor="middle">① reconnect → mở cửa sổ + event</text>
+
+  <path class="sv-line" d="M360,130 L592,130" marker-end="url(#ar3)"/>
+  <text class="sv-tl" x="476" y="122" text-anchor="middle">② gọi v2_plan (read-only)</text>
+
+  <path class="sv-line" d="M592,170 L368,170" marker-end="url(#ar3)"/>
+  <text class="sv-tl" x="480" y="162" text-anchor="middle">③ plan: ops 2 chiều + conflicts</text>
+
+  <rect class="sv-warn" x="240" y="196" width="240" height="66" rx="10"/>
+  <text class="sv-twarn" x="360" y="222" text-anchor="middle">④ BẠN QUYẾT ĐỊNH</text>
+  <text class="sv-ts" x="360" y="243" text-anchor="middle">「Duyệt &amp; Đồng bộ」 hoặc 「Bỏ qua」</text>
+
+  <path class="sv-line2" d="M240,229 C 180,229 150,250 140,280"/>
+  <text class="sv-tl" x="150" y="300" text-anchor="middle">Bỏ qua → không làm gì,</text>
+  <text class="sv-tl" x="150" y="316" text-anchor="middle">chờ lần bấm tay sau</text>
+
+  <path class="sv-lok" d="M480,229 L 592,229" marker-end="url(#ar3ok)"/>
+  <text class="sv-tok" x="536" y="221" text-anchor="middle">⑤ v2_apply</text>
+
+  <path class="sv-lok" d="M600,270 L 822,270" marker-end="url(#ar3ok)"/>
+  <text class="sv-tl" x="710" y="262" text-anchor="middle">⑥ CẤT bản cũ trước khi ghi/xóa</text>
+
+  <rect class="sv-ok" x="510" y="300" width="180" height="56" rx="10"/>
+  <text class="sv-tok" x="600" y="323" text-anchor="middle">⑦ copy atomic + journal</text>
+  <text class="sv-ts" x="600" y="343" text-anchor="middle">run_id → undo được</text>
+
+  <path class="sv-line" d="M592,382 L368,382" marker-end="url(#ar3)"/>
+  <text class="sv-tl" x="480" y="374" text-anchor="middle">⑧ báo cáo: copy/xóa/conflict còn lại</text>
+</svg>
+<figcaption>Hình 3 — Reconnect không bao giờ tự sync: bước ④ là cổng duyệt bắt buộc. Conflict cũng hiện tại đây để chọn từng file.</figcaption>
+</figure>
+
+<div class="callout ok"><b>Quy tắc bất biến:</b> engine cất bản cũ vào version store <b>trước</b> mọi thao tác ghi đè/xóa (bước ⑥). Duyệt nhầm vẫn <b>Hoàn tác</b> được nguyên lần sync qua <code>run_id</code>, hoặc khôi phục từng file từ lịch sử.</div>
+
+<h2><span class="n">4</span>Định kỳ: tự chạy phần an toàn, conflict thì hỏi</h2>
+<p>Vòng định kỳ (mặc định 30 phút) giữ như cũ, thêm 2 luật mới: <strong>bỏ qua cặp đang mất kết nối</strong>, và <strong>conflict thì bật cửa sổ chờ duyệt</strong> thay vì im lặng.</p>
+
+<figure>
+<svg viewBox="0 0 940 300" role="img" aria-label="Luồng định kỳ">
+  <defs>
+    <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b93"/>
+    </marker>
+  </defs>
+
+  <rect class="sv-box" x="30" y="110" width="150" height="60" rx="10"/>
+  <text class="sv-t" x="105" y="136" text-anchor="middle">Hẹn giờ</text>
+  <text class="sv-ts" x="105" y="156" text-anchor="middle">mỗi N phút</text>
+
+  <path class="sv-line" d="M180,140 L242,140" marker-end="url(#ar4)"/>
+
+  <!-- decision 1 -->
+  <polygon class="sv-box2" points="330,100 420,140 330,180 240,140"/>
+  <text class="sv-t" x="330" y="137" text-anchor="middle">Còn kết</text>
+  <text class="sv-t" x="330" y="155" text-anchor="middle">nối?</text>
+
+  <path class="sv-lbad" d="M330,180 L330,238" marker-end="url(#ar4)"/>
+  <text class="sv-tbad" x="352" y="212">KHÔNG</text>
+  <rect class="sv-bad" x="240" y="242" width="180" height="44" rx="10"/>
+  <text class="sv-t" x="330" y="269" text-anchor="middle">Bỏ qua cặp này</text>
+
+  <path class="sv-lok" d="M420,140 L482,140" marker-end="url(#ar4)"/>
+  <text class="sv-tok" x="448" y="130" text-anchor="middle">CÓ</text>
+
+  <rect class="sv-ok" x="486" y="108" width="190" height="64" rx="10"/>
+  <text class="sv-t" x="581" y="134" text-anchor="middle">Apply phần AN TOÀN</text>
+  <text class="sv-ts" x="581" y="155" text-anchor="middle">engine không bao giờ tự xử conflict</text>
+
+  <path class="sv-line" d="M676,140 L738,140" marker-end="url(#ar4)"/>
+
+  <!-- decision 2 -->
+  <polygon class="sv-box2" points="820,100 905,140 820,180 735,140"/>
+  <text class="sv-t" x="820" y="137" text-anchor="middle">Có</text>
+  <text class="sv-t" x="820" y="155" text-anchor="middle">conflict?</text>
+
+  <path class="sv-line" d="M820,100 L820,60 L620,60" marker-end="url(#ar4)"/>
+  <text class="sv-tl" x="730" y="52" text-anchor="middle">Không → xong, chờ chu kỳ sau</text>
+
+  <path class="sv-lwarn" d="M820,180 L820,238" marker-end="url(#ar4)"/>
+  <text class="sv-twarn" x="852" y="212">CÓ</text>
+  <rect class="sv-warn" x="700" y="242" width="230" height="44" rx="10"/>
+  <text class="sv-t" x="815" y="269" text-anchor="middle">Mở cửa sổ → thẻ duyệt từng file</text>
+</svg>
+<figcaption>Hình 4 — Định kỳ: phần hội tụ tự chạy; xung đột luôn cần bạn chọn「Giữ Gốc」/「Giữ Bản làm việc」.</figcaption>
+</figure>
+
+<h2><span class="n">5</span>Chốt an toàn: rút USB ≠ xóa file</h2>
+<div class="callout danger"><b>Lỗ hổng ở 0.2.0:</b> <code>scan_dir</code> trả về chỉ mục <b>rỗng</b> khi thư mục không tồn tại. Nếu ổ working bị rút đúng lúc chạy định kỳ, diff hiểu là "mọi file đã bị xóa ở working" → lên kế hoạch xóa lan sang bản gốc.</div>
+
+<figure>
+<svg viewBox="0 0 940 240" role="img" aria-label="So sánh trước và sau chốt an toàn">
+  <defs>
+    <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b93"/>
+    </marker>
+  </defs>
+
+  <!-- before -->
+  <rect class="sv-bad" x="30" y="24" width="430" height="196" rx="12"/>
+  <text class="sv-tbad" x="245" y="52" text-anchor="middle">TRƯỚC — 0.2.0</text>
+  <rect class="sv-box2" x="60" y="72" width="160" height="44" rx="8"/>
+  <text class="sv-ts" x="140" y="99" text-anchor="middle">USB bị rút ra</text>
+  <path class="sv-line" d="M220,94 L268,94" marker-end="url(#ar5)"/>
+  <rect class="sv-box2" x="272" y="72" width="160" height="44" rx="8"/>
+  <text class="sv-ts" x="352" y="92" text-anchor="middle">scan → chỉ mục rỗng</text>
+  <text class="sv-ts" x="352" y="108" text-anchor="middle">= "đã xóa hết?!"</text>
+  <path class="sv-lbad" d="M352,116 L352,158" marker-end="url(#ar5)"/>
+  <rect class="sv-bad" x="240" y="162" width="200" height="44" rx="8"/>
+  <text class="sv-tbad" x="340" y="189" text-anchor="middle">Xóa lan sang BẢN GỐC</text>
+
+  <!-- after -->
+  <rect class="sv-ok" x="490" y="24" width="430" height="196" rx="12"/>
+  <text class="sv-tok" x="705" y="52" text-anchor="middle">SAU — 0.3.0</text>
+  <rect class="sv-box2" x="520" y="72" width="160" height="44" rx="8"/>
+  <text class="sv-ts" x="600" y="99" text-anchor="middle">USB bị rút ra</text>
+  <path class="sv-line" d="M680,94 L728,94" marker-end="url(#ar5)"/>
+  <rect class="sv-box2" x="732" y="72" width="160" height="44" rx="8"/>
+  <text class="sv-ts" x="812" y="92" text-anchor="middle">read_dir lỗi →</text>
+  <text class="sv-ts" x="812" y="108" text-anchor="middle">đánh dấu MẤT KẾT NỐI</text>
+  <path class="sv-lok" d="M812,116 L812,158" marker-end="url(#ar5)"/>
+  <rect class="sv-ok" x="700" y="162" width="200" height="44" rx="8"/>
+  <text class="sv-tok" x="800" y="182" text-anchor="middle">plan/apply bị CHẶN</text>
+  <text class="sv-ts" x="800" y="199" text-anchor="middle">không file nào bị đụng</text>
+</svg>
+<figcaption>Hình 5 — Chốt an toàn kiểm tra cả 2 phía trước khi plan/apply; watcher và scheduler cùng tôn trọng trạng thái này.</figcaption>
+</figure>
+
+<h2><span class="n">6</span>Time travel — lưới an toàn cuối cùng</h2>
+<p>Không thao tác nào phá hủy dữ liệu ngay lập tức. Mọi ghi đè/xóa đều đi qua version store (định danh theo hash BLAKE3) kèm journal theo <code>run_id</code>:</p>
+<ul>
+  <li><strong>Hoàn tác cả lần sync</strong>: nút「Hoàn tác lần đồng bộ gần nhất」→ khôi phục nội dung file <em>và</em> baseline.</li>
+  <li><strong>Khôi phục từng file</strong> (UI mới): nhập đường dẫn tương đối → xem danh sách phiên bản (thời gian · thao tác · kích thước) → khôi phục ra vị trí bạn chọn.</li>
+  <li>File bị <em>xóa</em> khi sync thực chất chỉ chuyển vào version store — như thùng rác có lịch sử.</li>
+</ul>
+
+<h2><span class="n">7</span>Những gì bị gỡ bỏ (cloud)</h2>
+<ul>
+  <li>Code: <code>sync/cloud.rs</code>, field <code>targets</code>/<code>rclone</code>, các command <code>v2_status</code>, <code>v2_add_target</code>, <code>v2_remove_target</code>, <code>v2_replicate</code>, <code>v2_connect_remote</code>.</li>
+  <li>UI: section trạng thái rclone, kết nối Google Drive/OneDrive, danh sách đích cloud, nút「Đẩy cloud」.</li>
+  <li>Config cũ trên máy có sẵn <code>targets</code> vẫn đọc bình thường (field lạ bị bỏ qua khi parse).</li>
+</ul>
+
+<div class="callout"><b>Checklist duyệt thiết kế:</b> ① reconnect luôn qua thẻ duyệt — đúng ý bạn? ② định kỳ tự chạy phần an toàn, chỉ hỏi khi conflict? ③ poll 5 giây chỉ <code>read_dir</code> gốc — đủ nhanh? ④ chốt an toàn chặn cả plan lẫn apply khi mất kết nối? ⑤ cloud gỡ sạch không để sót UI?</div>
+
+</main>
+</body>
+</html>
