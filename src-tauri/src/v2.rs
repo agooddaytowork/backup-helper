@@ -331,6 +331,12 @@ pub struct ConnPayload {
     pub connected: bool,
 }
 
+#[derive(Serialize, Clone)]
+pub struct ConflictPayload {
+    pub pair_id: String,
+    pub count: usize,
+}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -430,8 +436,24 @@ pub fn start_scheduler(app: AppHandle) {
             continue;
         }
         for id in ids {
-            let mut m = st.lock().unwrap();
-            let _ = m.apply(&id); // apply chỉ chạy thao tác an toàn; conflict để người dùng quyết
+            let report = {
+                let mut m = st.lock().unwrap();
+                // Cặp đang mất kết nối: bỏ qua chu kỳ này (guard trong apply
+                // vẫn chặn thêm lần nữa nếu vừa rút ra sau khi kiểm tra).
+                if !m.conn.get(&id).copied().unwrap_or(true) {
+                    continue;
+                }
+                m.apply(&id) // chỉ thao tác an toàn; conflict không tự xử lý
+            };
+            if let Ok(r) = report {
+                if !r.conflicts.is_empty() {
+                    let _ = app.emit(
+                        "v2-conflicts",
+                        ConflictPayload { pair_id: id.clone(), count: r.conflicts.len() },
+                    );
+                    show_main_window(&app);
+                }
+            }
         }
     });
 }
