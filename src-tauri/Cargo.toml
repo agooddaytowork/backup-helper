@@ -9,6 +9,11 @@ edition = "2021"
 name = "backup_helper_lib"
 crate-type = ["rlib"]
 
+[features]
+# Bắt buộc cho Tauri v1: `tauri build` chạy với --features custom-protocol
+# (bản production nạp asset qua custom protocol thay vì dev server).
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "1", features = [] }
 
