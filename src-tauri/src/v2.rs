@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct V2Pair {
@@ -338,7 +338,7 @@ pub struct ConflictPayload {
 }
 
 fn show_main_window(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
+    if let Some(w) = app.get_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
@@ -367,18 +367,18 @@ pub fn start_conn_watcher(app: AppHandle) {
                 }
                 match ev {
                     Some(ConnEvent::Disconnected) => {
-                        let _ = app.emit(
+                        let _ = app.emit_all(
                             "v2-conn-changed",
                             ConnPayload { pair_id: p.id.clone(), connected: false },
                         );
                     }
                     Some(ConnEvent::Reconnected) => {
-                        let _ = app.emit(
+                        let _ = app.emit_all(
                             "v2-conn-changed",
                             ConnPayload { pair_id: p.id.clone(), connected: true },
                         );
                         // Reconnect KHÔNG tự sync: chỉ báo UI hiện thẻ duyệt.
-                        let _ = app.emit(
+                        let _ = app.emit_all(
                             "v2-reconnected",
                             ConnPayload { pair_id: p.id.clone(), connected: true },
                         );
@@ -447,7 +447,7 @@ pub fn start_scheduler(app: AppHandle) {
             };
             if let Ok(r) = report {
                 if !r.conflicts.is_empty() {
-                    let _ = app.emit(
+                    let _ = app.emit_all(
                         "v2-conflicts",
                         ConflictPayload { pair_id: id.clone(), count: r.conflicts.len() },
                     );
@@ -460,7 +460,7 @@ pub fn start_scheduler(app: AppHandle) {
 
 /// Khởi tạo state v2 trong setup của Tauri.
 pub fn init(app: &AppHandle) -> SyncManager {
-    let base = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let base = app.path_resolver().app_data_dir().unwrap_or_else(|| PathBuf::from("."));
     let v2dir = base.join("v2");
     let _ = std::fs::create_dir_all(&v2dir);
     let engine = Engine::open(&v2dir.join("meta.db"), &v2dir.join("store"))

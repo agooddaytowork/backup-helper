@@ -7,7 +7,7 @@ use notify_debouncer_mini::{new_debouncer, Debouncer};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Manager};
 
 pub enum Msg {
     RunNow,
@@ -219,5 +219,5 @@ fn push_status(
         s.last_summary = sum;
         s.last_run = Some(chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     }
-    let _ = app.emit("status", s.clone());
+    let _ = app.emit_all("status", s.clone());
 }

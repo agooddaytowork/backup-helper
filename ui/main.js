@@ -1,4 +1,4 @@
-const { invoke } = window.__TAURI__.core;
+const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);

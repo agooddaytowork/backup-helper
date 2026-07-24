@@ -10,11 +10,10 @@ use engine::Engine;
 use logger::Logger;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
-use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
-use tauri_plugin_dialog::DialogExt;
+use tauri::{
+    AppHandle, CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem, WindowEvent,
+};
 
 /// Trạng thái hiển thị cho UI.
 #[derive(Clone, Serialize)]
@@ -62,6 +61,18 @@ fn reload_engine(state: &AppState, cfg: &Config) {
     }
 }
 
+/// Bộ tự-khởi-động cùng máy (registry Run key trên Windows) qua crate auto-launch.
+/// Thay cho tauri-plugin-autostart (chỉ có bản v2).
+fn autolauncher() -> Option<auto_launch::AutoLaunch> {
+    let exe = std::env::current_exe().ok()?;
+    auto_launch::AutoLaunchBuilder::new()
+        .set_app_name("Backup Helper")
+        .set_app_path(&exe.to_string_lossy())
+        .set_args(&["--minimized"])
+        .build()
+        .ok()
+}
+
 // ---------------- Commands ----------------
 
 #[tauri::command]
@@ -81,11 +92,10 @@ fn get_logs(state: State<AppState>) -> Vec<String> {
 
 /// Mở hộp thoại chọn thư mục (chạy phía Rust để tương thích mọi HĐH).
 #[tauri::command]
-async fn pick_folder(app: AppHandle) -> Option<String> {
+async fn pick_folder() -> Option<String> {
     let (tx, rx) = std::sync::mpsc::channel();
-    app.dialog().file().pick_folder(move |p| {
-        let path = p.and_then(|fp| fp.into_path().ok())
-            .map(|pb| pb.to_string_lossy().to_string());
+    tauri::api::dialog::FileDialogBuilder::new().pick_folder(move |p| {
+        let path = p.map(|pb| pb.to_string_lossy().to_string());
         let _ = tx.send(path);
     });
     tauri::async_runtime::spawn_blocking(move || rx.recv().ok().flatten())
@@ -189,8 +199,9 @@ fn set_autostart(app: AppHandle, state: State<AppState>, enabled: bool) -> Confi
         config::save(&app, &cfg);
         cfg.clone()
     };
-    let al = app.autolaunch();
-    let _ = if enabled { al.enable() } else { al.disable() };
+    if let Some(al) = autolauncher() {
+        let _ = if enabled { al.enable() } else { al.disable() };
+    }
     cfg
 }
 
@@ -203,27 +214,27 @@ fn backup_now(state: State<AppState>) {
 
 #[tauri::command]
 fn show_window(app: AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
-    }
+    open_main(&app);
 }
 
 // ---------------- Setup ----------------
 
-fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let show = MenuItemBuilder::with_id("show", "Mở cửa sổ").build(app)?;
-    let backup = MenuItemBuilder::with_id("backup", "Sao lưu ngay").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Thoát").build(app)?;
-    let menu = MenuBuilder::new(app).items(&[&show, &backup, &quit]).build()?;
+fn build_tray() -> SystemTray {
+    let show = CustomMenuItem::new("show", "Mở cửa sổ");
+    let backup = CustomMenuItem::new("backup", "Sao lưu ngay");
+    let quit = CustomMenuItem::new("quit", "Thoát");
+    let menu = SystemTrayMenu::new()
+        .add_item(show)
+        .add_item(backup)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(quit);
+    SystemTray::new().with_menu(menu)
+}
 
-    TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Backup Helper — Sao lưu dữ liệu")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
+fn on_tray_event(app: &AppHandle, event: SystemTrayEvent) {
+    match event {
+        SystemTrayEvent::LeftClick { .. } => open_main(app),
+        SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
             "show" => open_main(app),
             "backup" => {
                 let state = app.state::<AppState>();
@@ -243,46 +254,34 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 app.exit(0);
             }
             _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                ..
-            } = event
-            {
-                open_main(tray.app_handle());
-            }
-        })
-        .build(app)?;
-    Ok(())
+        },
+        _ => {}
+    }
 }
 
 fn open_main(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
+    if let Some(w) = app.get_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--minimized"]),
-        ))
+        .system_tray(build_tray())
+        .on_system_tray_event(on_tray_event)
         .setup(|app| {
-            let handle = app.handle().clone();
+            let handle = app.handle();
             let logger = Arc::new(Logger::new(&handle));
             logger.cleanup();
 
             let cfg = config::load(&handle);
 
             // Đồng bộ trạng thái tự khởi động với cấu hình.
-            let al = app.autolaunch();
-            let _ = if cfg.autostart { al.enable() } else { al.disable() };
+            if let Some(al) = autolauncher() {
+                let _ = if cfg.autostart { al.enable() } else { al.disable() };
+            }
 
             let status = Arc::new(Mutex::new(Status::from_cfg(&cfg)));
             let eng = Engine::start(handle.clone(), cfg.clone(), logger.clone(), status.clone());
@@ -299,10 +298,8 @@ pub fn run() {
             v2::start_scheduler(handle.clone());
             v2::start_conn_watcher(handle.clone());
 
-            build_tray(app)?;
-
             // Đóng cửa sổ = thu nhỏ xuống khay, không thoát app.
-            if let Some(win) = app.get_webview_window("main") {
+            if let Some(win) = app.get_window("main") {
                 let w = win.clone();
                 win.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {

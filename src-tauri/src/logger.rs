@@ -2,7 +2,7 @@ use chrono::{Local, NaiveDate};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 /// Ghi log ra file theo ngày và giữ lại đúng 2 ngày gần nhất (hôm nay + hôm qua)
 /// để phục vụ audit. Mỗi dòng cũng được phát ra sự kiện "log" cho UI hiển thị.
@@ -14,7 +14,7 @@ pub struct Logger {
 impl Logger {
     pub fn new(app: &AppHandle) -> Self {
         let dir = app
-            .path()
+            .path_resolver()
             .app_log_dir()
             .expect("không lấy được thư mục log");
         let _ = fs::create_dir_all(&dir);
@@ -40,7 +40,7 @@ impl Logger {
         if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&file) {
             let _ = writeln!(f, "{}", line);
         }
-        let _ = self.app.emit("log", &line);
+        let _ = self.app.emit_all("log", &line);
     }
 
     /// Xóa các file log cũ hơn 2 ngày (chỉ giữ hôm nay và hôm qua).

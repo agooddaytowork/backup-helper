@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 /// Một cặp thư mục cần sao lưu: nguồn -> đích.
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -65,7 +65,7 @@ impl Default for Config {
 
 fn config_path(app: &AppHandle) -> PathBuf {
     let dir = app
-        .path()
+        .path_resolver()
         .app_config_dir()
         .expect("không lấy được thư mục cấu hình");
     let _ = std::fs::create_dir_all(&dir);

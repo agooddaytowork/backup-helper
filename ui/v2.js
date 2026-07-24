@@ -1,5 +1,5 @@
 (function () {
-  const { invoke } = window.__TAURI__.core;
+  const { invoke } = window.__TAURI__.tauri;
   const $ = (id) => document.getElementById(id);
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

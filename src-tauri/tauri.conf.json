@@ -1,13 +1,20 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Backup Helper",
-  "version": "0.3.0",
-  "identifier": "com.backuphelper.app",
+  "$schema": "https://schema.tauri.app/config/1",
   "build": {
-    "frontendDist": "../ui"
-  },
-  "app": {
+    "distDir": "../ui",
+    "devPath": "../ui",
     "withGlobalTauri": true,
+    "beforeBuildCommand": "",
+    "beforeDevCommand": ""
+  },
+  "package": {
+    "productName": "Backup Helper",
+    "version": "0.3.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false
+    },
     "windows": [
       {
         "label": "main",
@@ -19,19 +26,29 @@
         "resizable": true
       }
     ],
+    "systemTray": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": false
+    },
     "security": {
       "csp": null
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "com.backuphelper.app",
+      "targets": "all",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "windows": {
+        "webviewInstallMode": {
+          "type": "downloadBootstrapper"
+        }
+      }
     }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
   }
 }

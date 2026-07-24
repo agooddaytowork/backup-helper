@@ -1,0 +1,5 @@
+# Ghim Rust 1.77 — bản CUỐI còn hỗ trợ Windows 7 / Server 2008 R2 ở tier chuẩn.
+# Từ Rust 1.78 (5/2024) target x86_64-pc-windows-msvc yêu cầu Windows 10+.
+[toolchain]
+channel = "1.77.2"
+targets = ["x86_64-pc-windows-msvc"]
